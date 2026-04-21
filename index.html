@@ -1,0 +1,1374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Smart Attendance – IoT Face Recognition</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <style>
+        /* BASE & LAYOUT */
+        body { margin: 0; font-family: Arial, sans-serif; background: hsl(223, 47%, 97%); }
+        .container { display: flex; padding: 20px; gap: 20px; }
+        .sidebar {
+            width: 260px; background: white; border-radius: 12px; padding: 20px;
+            box-shadow: 0 2px 10px #00000015; height: 95vh; overflow-y: auto;
+        }
+        .page {
+            flex: 1; background: white; padding: 20px; border-radius: 12px;
+            box-shadow: 0 2px 10px #00000015; overflow-x: hidden;
+        }
+
+        /* INPUTS & BUTTONS */
+        button {
+            padding: 10px 14px; border: none; border-radius: 8px; background: #2563eb;
+            color: white; cursor: pointer; font-size: 14px; transition: background 0.2s;
+        }
+        button:hover { background: #1746b0; }
+        input, select, textarea {
+            width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc;
+            margin-bottom: 10px; box-sizing: border-box;
+        }
+        textarea { min-height: 100px; }
+
+        /* NAVIGATION */ 
+        .nav-btn {
+            display: block; width: 100%; padding: 10px; margin: 5px 0; border-radius: 8px;
+            background: #828181; cursor: pointer; text-align: left; border: none; color: white;
+        }
+        .nav-btn.active { background: #2563eb; color: white; }
+
+        /* GRID & BOXES */
+        .grid {
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 20px;
+        }
+        .box {
+            background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px #00000010;
+        }
+
+        /* TABLES */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .student-photo-preview {
+            width: 50px; height: 50px; object-fit: cover; border-radius: 4px; vertical-align: middle;
+        }
+
+        /* STUDENT/BROADCAST SPECIFIC */
+        #broadcast-msg { background: #f0f0f0; padding: 20px; border-radius: 6px; margin-bottom: 20px; }
+
+        /* LOGIN PAGE */
+        #login-page {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 90vh; background: #f4f6fb;
+        }
+        #login-box {
+            background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px #00000015;
+            width: 300px;
+        }
+        #login-box input { margin-bottom: 20px; }
+        .main-app-content { display: none; width: 100%; }
+        
+        /* TIMETABLE SPECIFIC */
+        #timetableOutput { overflow-x: auto; }
+        
+        /* PASSWORD TOGGLE */
+        .password-container {
+            position: relative;
+            width: 100%;
+        }
+        .toggle-password {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            color: #000; /* Make the icon black */
+        }
+        .toggle-password:hover {
+            background-color: #eee;
+        }
+        
+        /* ANNOUNCEMENTS */
+        .announcement-item {
+            border-bottom: 1px solid #eee;
+            padding: 10px 0;
+        }
+        .announcement-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+
+    <h2 style="padding: 10px 20px; margin: 0;">Smart Attendance • IoT Face Recognition</h2>
+
+    <div id="login-page">
+        <div id="login-box">
+            <h3>Admin Login</h3>
+            <label for="adminEmail">Email:</label>
+            <input type="email" id="adminEmail" placeholder="admin@example.com">
+            <label for="adminPass">Password:</label>
+            <div class="password-container">
+                <input type="password" id="adminPass" placeholder="password">
+                <button class="toggle-password" id="togglePassword">👁</button>
+            </div>
+            <button id="signInBtn" style="width: 100%; margin-bottom: 10px;">Sign In (Admin)</button>
+            <button id="signUpBtn" style="width: 100%; background:#999;">Sign Up (Not Implemented)</button>
+
+            <hr>
+
+            <h3>Student Access</h3>
+            <button id="studentAccessBtn" style="width: 100%; background: #00b894;">Continue as Student (View Broadcast)</button>
+        </div>
+    </div>
+
+    <div class="main-app-content">
+        <div class="container">
+
+            <div class="sidebar">
+                <h3>Navigation</h3>
+                
+                <button class="nav-btn active" onclick="openPage('dashboard', this)">Dashboard</button>
+                <button class="nav-btn" onclick="openPage('student-dashboard', this)">Student View</button>
+                <button class="nav-btn" onclick="openPage('timetable-management', this)">Timetable Management</button>
+                <button class="nav-btn" onclick="openPage('students', this)">Students</button>
+                <button class="nav-btn" onclick="openPage('attendance', this)">Live Attendance</button>
+                <button class="nav-btn" onclick="openPage('reports', this)">Reports</button>
+                <button class="nav-btn" onclick="openPage('feedback', this)">Feedback & Messaging</button>
+                <button class="nav-btn" onclick="openPage('settings', this)">Settings</button>
+
+                <div id="admin-sidebar-controls" style="display: none;">
+                    <hr>
+                    <h3>Enroll Student</h3>
+                    <label for="studentName">Full Name:</label>
+                    <input id="studentName" placeholder="Full name">
+                    <label for="studentId">Student ID:</label>
+                    <input id="studentId" placeholder="Student ID e.g. CS2025">
+                    <label for="studentBranch">Branch:</label>
+                    <select id="studentBranch">
+                        <option>BE–ECS</option>
+                        <option>BE–CSE</option>
+                        <option>BE–ENTC</option>
+                        <option>BE–ECE</option>
+                        <option>BE–AI&DS</option>
+                    </select>
+                    <label for="studentPhoto">Photo:</label>
+                    <input id="studentPhoto" type="file" accept="image/*">
+                    <button id="enrollBtn">Enroll Student</button>
+                </div>
+
+                <hr>
+
+                <button id="exportBtn" style="width:100%; margin-bottom:10px;">Export CSV</button>
+                <button id="refreshBtn" style="width:100%; background:#999;">Refresh Data</button>
+            </div>
+
+            <div class="page" id="timetable-management" style="display:none;">
+                <h2>Timetable Management & Course Setup</h2>
+                <div class="grid">
+                    <div class="box" id="admin-course-setup">
+                        <h3>Add New Course/Subject</h3>
+                        <label for="courseId">Course ID (e.g., CS301):</label>
+                        <input id="courseId" placeholder="Unique Course ID">
+                        <label for="courseName">Course Name:</label>
+                        <input id="courseName" placeholder="e.g., Deep Learning">
+
+                        <label for="courseBranch">Target Branch:</label>
+                        <select id="courseBranch">
+                            <option>BE–ECS</option>
+                            <option>BE–CSE</option>
+                            <option>BE–ENTC</option>
+                            <option>BE–ECE</option>
+                            <option>BE–AI&DS</option>
+                            <option>All</option>
+                        </select>
+                        <button id="addCourseBtn" style="width: 100%;">Add Course</button>
+                    </div>
+                    <div class="box" id="admin-session-setup">
+                        <h3>Schedule New Session</h3>
+                        <label for="scheduleCourseSelect">Select Course:</label>
+                        <select id="scheduleCourseSelect">
+                            <option value="Select Course">Select Course</option>
+                        </select>
+                        <label for="sessionDay">Day of Week:</label>
+                        <select id="sessionDay">
+                            <option value="1">Monday</option>
+                            <option value="2">Tuesday</option>
+                            <option value="3">Wednesday</option>
+                            <option value="4">Thursday</option>
+                            <option value="5">Friday</option>
+                        </select>
+                        <label for="sessionTime">Start Time (24h format):</label>
+                        <input type="time" id="sessionTime" value="10:00">
+                        <label for="sessionDuration">Duration (minutes):</label>
+                        <input type="number" id="sessionDuration" value="60" min="30">
+                        <button id="addSessionBtn" style="width: 100%;">Schedule Session</button>
+                    </div>
+                </div>
+                <div class="box" style="margin-top: 20px;">
+                    <h3>Current Weekly Schedule</h3>
+                    <div id="timetableOutput">Loading schedule...</div>
+                </div>
+            </div>
+
+            <div class="page" id="dashboard">
+                <h2>Admin Dashboard</h2>
+
+                <div class="grid">
+                    <div class="box">
+                        <h3>Live Attendance Summary</h3>
+                        <p>Total Students: <strong>0</strong></p>
+                        <p>Present Now: <strong>0</strong></p>
+                        <p>Absent Today: <strong>0</strong></p>
+                        <p>Last Update: <strong>N/A</strong></p>
+                    </div>
+
+                    <div class="box">
+                        <h3>Analytics / Student Details</h3>
+                        <label for="dashboardSubjectSelect">Subject:</label>
+                        <select id="dashboardSubjectSelect">
+                            <option>Embedded Systems</option>
+                            <option>Machine Learning</option>
+                            <option>Deep Learning</option>
+                            <option>DevOps</option>
+                            <option>IoT</option>
+                            <option>Java Programming</option>
+                        </select>
+                        <label for="monthSelect">Month:</label>
+                        <select id="monthSelect">
+                            <option>November 2025</option>
+                            <option>December 2025</option>
+                        </select>
+                        <label for="studentSelect">Student:</label>
+                        <select id="studentSelect">
+                            <option>Select Student</option>
+                        </select>
+                        <button id="calculateBtn">Calculate Attendance %</button>
+                    </div>
+                </div>
+                
+                <div class="box" style="margin-top:20px;">
+                    <h3>Student Subject Summary</h3>
+                    <p id="analyticsOutput">Select subject/month to view percentage.</p>
+                </div>
+            </div>
+            
+            <div class="page" id="student-dashboard" style="display:none;">
+                <h2>Student Dashboard</h2>
+                <div id="broadcast-msg">
+                    <h4>📢 All Announcements</h4>
+                    <div id="studentBroadcastContent">Loading announcements...</div>
+                </div>
+                <div class="box" style="margin-top:20px;">
+                    <h3>My Attendance Summary</h3>
+                    <p>To implement personal summary, the student would need to log in individually (not as a guest) to fetch their attendance records.</p>
+                </div>
+            </div>
+
+            <div class="page" id="students" style="display:none;">
+                <h2>Enrolled Students</h2>
+                <div class="box">
+                    <p>List of enrolled students will appear here.</p>
+                </div>
+            </div>
+
+            <div class="page" id="attendance" style="display:none;">
+                <h2>Live Attendance Log (RPi Input)</h2>
+                <div class="box">
+                    <p>Logs from the automatic face recognition system will appear here. </p>
+                </div>
+            </div>
+
+            <div class="page" id="reports" style="display:none;">
+                <h2>Reports</h2>
+                <div class="grid">
+                    <div class="box">
+                        <h3>Monthly Attendance Reports</h3>
+                        <label for="reportMonth">Select Month:</label>
+                        <input type="month" id="reportMonth" value="2025-11">
+                        <br><br>
+                        <button id="generateMonthlyReportBtn" style="width: 100%; margin-bottom: 8px;">Generate Monthly Report</button>
+                        <button id="downloadReportCsvBtn" style="width: 100%; background: #27ae60; color: white; margin-bottom: 8px;">Download Report as CSV</button>
+                        
+                        <h3>Monthly Attendance Summary (<span id="reportMonthDisplay">2025-11</span>)</h3>
+                        <div id="reportOutput">
+                            <p>Generate a report to view summary.</p>
+                        </div>
+                    </div>
+                    <div class="box">
+                        <h3>Export Options</h3>
+                        <p>Generate and download attendance data in CSV format:</p>
+                        <button id="exportAllLogsBtn" style="width: 100%; margin-bottom: 8px; background: #2563eb; color: white;">Export All Attendance Logs</button>
+                        <button id="exportCurrentReportBtn" style="width: 100%; background: #27ae60; color: white;">Export Current Report</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="page" id="feedback" style="display:none;">
+                <h2>Feedback & Messaging</h2>
+                
+                <div id="adminBroadcastBlock" class="box" style="margin-top:10px; display:none;">
+                    <h3>Admin Broadcast Center (Send Message to Students)</h3>
+                    <textarea id="broadcastText" placeholder="Write your announcement here..."></textarea>
+                    <button id="sendBroadcastBtn" style="width:100%; background:#ff7f00;">Send Message</button>
+
+                    <div style="margin-top:15px; padding:10px; background:#e6f7ff; border-radius:4px;">
+                        <h4>Latest Message Sent:</h4>
+                        <p id="latestBroadcast">Loading...</p>
+                    </div>
+                </div>
+
+                <div class="box" style="margin-top: 20px;">
+                    <h3>Student Feedback Received (Admin View)</h3>
+                    <ul id="feedbackList">
+                        <li>Loading student feedbacks...</li>
+                    </ul>
+                </div>
+                
+                <div class="box" style="margin-top: 20px;">
+                    <h3>Submit General Feedback (All Users)</h3>
+                    <textarea id="submitFeedbackText" placeholder="Write your feedback here..."></textarea>
+                    <button id="submitFeedbackBtn">Submit Feedback</button>
+                </div>
+            </div>
+
+            <div class="page" id="settings" style="display:none;">
+                <h2>Settings</h2>
+                <div class="box">
+                    <p>Application settings go here.</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+<script>
+    // _________________________________________________________________
+    // 🚀 SECTION 1: CONFIGURATION & INITIALIZATION
+    // _________________________________________________________________
+
+    // 🔥 CLOUDINARY CONFIGURATION
+    const CLOUDINARY_CLOUD_NAME = "damkuyllx";
+    const CLOUDINARY_UPLOAD_PRESET = "attendance_upload";
+
+    // 🔥 FIREBASE CONFIGURATION (Using your provided config)
+    const firebaseConfig = {
+        apiKey: "AIzaSyAuh70XAWrm6CbQpDAVqFRvJVkaIlbyLc8",
+        authDomain: "smart-attendance-system-143d4.firebaseapp.com",
+        databaseURL: "https://smart-attendance-system-143d4-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "smart-attendance-system-143d4",
+        storageBucket: "smart-attendance-system-143d4.firebasestorage.app",
+        messagingSenderId: "742939794516",
+        appId: "1:742939794516:web:3da3d39603f3064431a1c1"
+    };
+
+    let db = null;
+    if (typeof firebase !== 'undefined' && typeof firebase.initializeApp === 'function') {
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.database();
+    } else {
+        console.error("Firebase SDK not initialized. Ensure script tags loaded correctly.");
+    }
+
+    // Global State
+    let students = [];
+    let courses = {}; 
+    let weeklySchedule = {}; 
+    let sessionLogs = []; 
+    let userRole = 'guest';
+
+    // DOM References
+    const loginPage = document.getElementById('login-page');
+    const mainAppContent = document.querySelector('.main-app-content');
+    const adminSidebarControls = document.getElementById('admin-sidebar-controls');
+    const adminBroadcastBlock = document.getElementById('adminBroadcastBlock');
+    const adminCourseSetup = document.getElementById('admin-course-setup');
+    const adminSessionSetup = document.getElementById('admin-session-setup');
+
+    // Helper: Converts Firebase object map to array
+    const objToArray = (obj) => obj ? Object.keys(obj).map(key => ({ ...obj[key], firebaseKey: key })) : [];
+    
+    // Helper: Get Day Name from day index (1=Mon, 5=Fri)
+    const getDayName = (dayIndex) => {
+        const names = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        return names[dayIndex] || 'Unknown';
+    }
+
+
+    // _________________________________________________________________
+    // 🚀 SECTION 2: UI NAVIGATION & UTILITY
+    // _________________________________________________________________
+
+    function showApp(role) {
+        userRole = role;
+        loginPage.style.display = 'none';
+        mainAppContent.style.display = 'block';
+
+        if (role === 'admin') {
+            adminSidebarControls.style.display = 'block';
+            adminBroadcastBlock.style.display = 'block';
+            
+            // Show admin-only sections
+            if (adminCourseSetup) adminCourseSetup.style.display = 'block';
+            if (adminSessionSetup) adminSessionSetup.style.display = 'block';
+            
+            loadStudents();
+            loadCourses(); 
+            loadWeeklySchedule(); 
+            
+            openPage('dashboard', document.querySelector('.nav-btn[onclick*="dashboard"]'));
+        } else if (role === 'student') {
+            adminSidebarControls.style.display = 'none';
+            adminBroadcastBlock.style.display = 'none';
+            
+            // Hide admin-only sections for students
+            if (adminCourseSetup) adminCourseSetup.style.display = 'none';
+            if (adminSessionSetup) adminSessionSetup.style.display = 'none';
+            
+            // FIX 1: Load all required data for student dashboard
+            loadStudents();
+            loadCourses(); 
+            loadWeeklySchedule(); 
+            loadLiveSessionLogs();
+            loadAllBroadcasts(); // Load all announcements for students
+            
+            // Open student dashboard
+            openPage('student-dashboard', document.querySelector('.nav-btn[onclick*="student-dashboard"]'));
+        }
+    }
+
+    // function openPage(pageId, element) {
+    //     document.querySelectorAll(".page").forEach(p => p.style.display = "none");
+    //     document.getElementById(pageId).style.display = "block";
+
+    //     let navButton = element || document.querySelector(`.nav-btn[onclick*="${pageId}"]`);
+    //     document.querySelectorAll(".nav-btn").forEach(btn => btn.classList.remove("active"));
+    //     if (navButton) navButton.classList.add("active");
+
+    //     if (pageId === 'students') loadStudents();
+    //     if (pageId === 'attendance') loadLiveSessionLogs();
+    //     if (pageId === 'dashboard') updateDashboardSummary();
+    //     if (pageId === 'student-dashboard') loadAllBroadcasts();
+    //     if (pageId === 'reports') { loadReports(); }
+    //     if (pageId === 'feedback') { loadFeedbacks(); loadAllBroadcasts(); }
+    //     if (pageId === 'timetable-management') { 
+    //         loadCourses(); 
+    //         loadWeeklySchedule(); 
+    //     } 
+    // }
+
+    // function loadReports() {
+    //     const monthEl = document.getElementById('reportMonth');
+    //     const monthDisplayEl = document.getElementById('reportMonthDisplay');
+    //     if(monthEl && monthDisplayEl) {
+    //         monthDisplayEl.textContent = monthEl.value;
+    //     }
+    // }
+
+    function openPage(pageId, element) {
+        document.querySelectorAll(".page").forEach(p => p.style.display = "none");
+        document.getElementById(pageId).style.display = "block";
+
+        let navButton = element || document.querySelector(`.nav-btn[onclick*="${pageId}"]`);
+        document.querySelectorAll(".nav-btn").forEach(btn => btn.classList.remove("active"));
+        if (navButton) navButton.classList.add("active");
+
+        if (pageId === 'students') loadStudents();
+        if (pageId === 'attendance') loadLiveSessionLogs();
+
+        // This ensures months are calculated when you click Dashboard or Reports
+        if (pageId === 'dashboard') {
+            updateDashboardSummary();
+            populateDynamicMonths(); 
+        }
+        if (pageId === 'reports') { 
+            loadReports(); 
+            populateDynamicMonths(); 
+        }
+
+        if (pageId === 'student-dashboard') loadAllBroadcasts();
+        if (pageId === 'feedback') { loadFeedbacks(); loadAllBroadcasts(); }
+        if (pageId === 'timetable-management') { 
+            loadCourses(); 
+            loadWeeklySchedule(); 
+        } 
+    }
+
+    // 🔥 NEW: DYNAMIC MONTH POPULATION
+    function populateDynamicMonths() {
+        const monthSelect = document.getElementById('monthSelect');
+        const reportMonthInput = document.getElementById('reportMonth');
+        
+        // Populate Analytics Month Dropdown
+        if (monthSelect) {
+            const now = new Date();
+            let optionsHtml = '';
+            // Generate list for the last 6 months + current month
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const monthName = d.toLocaleString('default', { month: 'long' });
+                const year = d.getFullYear();
+                const value = `${monthName} ${year}`;
+                optionsHtml += `<option value="${value}">${value}</option>`;
+            }
+            monthSelect.innerHTML = optionsHtml;
+        }
+
+        // Set Reports default YYYY-MM to current real-time month
+        if (reportMonthInput && !reportMonthInput.value) {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            reportMonthInput.value = `${year}-${month}`;
+        }
+    }
+
+    // _________________________________________________________________
+    // 🚀 SECTION 3: TIMETABLE & COURSE MANAGEMENT
+    // _________________________________________________________________
+
+    // 🔥 ADD COURSE
+    function handleAddCourse() {
+        if (userRole !== 'admin') return alert('Admin access required.');
+        const id = document.getElementById('courseId').value.trim();
+        const name = document.getElementById('courseName').value.trim();
+        const branch = document.getElementById('courseBranch').value;
+
+        if (!id || !name) return alert('Please enter Course ID and Name.');
+
+        const enrolledIds = students.filter(s => branch === 'All' || s.branch === branch).map(s => s.id);
+
+        db.ref(`courses/${id}`).set({
+            course_id: id,
+            name: name,
+            branch: branch,
+            enrolled_students: enrolledIds
+        }).then(() => {
+            alert(`Course "${name}" added successfully!`);
+            document.getElementById('courseId').value = '';
+            document.getElementById('courseName').value = '';
+            loadCourses(); 
+        }).catch(err => alert('Failed to add course: ' + err.message));
+    }
+
+    // 🔥 LOAD COURSES (for dashboard + timetable dropdown)
+    function loadCourses() {
+        if (!db) return;
+        db.ref('courses').once('value').then(snap => {
+            courses = snap.val() || {};
+            
+            const optionsHtml = Object.keys(courses).map(id => 
+                `<option value="${id}">${courses[id].name} (${id})</option>`
+            ).join('');
+            
+            const dashboardSubjectSelect = document.getElementById('dashboardSubjectSelect');
+            if (dashboardSubjectSelect) {
+                dashboardSubjectSelect.innerHTML = `<option value="Select Subject">Select Subject</option>` + optionsHtml;
+            }
+            
+            const scheduleCourseSelect = document.getElementById('scheduleCourseSelect');
+            if (scheduleCourseSelect) {
+                scheduleCourseSelect.innerHTML = `<option value="Select Course">Select Course</option>` + optionsHtml;
+            }
+            
+        }).catch(err => {
+            console.error("Error loading courses:", err);
+            const dashboardSubjectSelect = document.getElementById('dashboardSubjectSelect');
+            if (dashboardSubjectSelect) {
+                dashboardSubjectSelect.innerHTML = `<option>Error Loading Subjects</option>`;
+            }
+            const scheduleCourseSelect = document.getElementById('scheduleCourseSelect');
+            if (scheduleCourseSelect) {
+                scheduleCourseSelect.innerHTML = `<option>Error Loading Courses</option>`;
+            }
+        });
+    }
+
+    // 🔥 SCHEDULE SESSION
+    function handleAddSession() {
+        if (userRole !== 'admin') return alert('Admin access required.');
+        const courseId = document.getElementById('scheduleCourseSelect').value;
+        const day = document.getElementById('sessionDay').value;
+        const time = document.getElementById('sessionTime').value;
+        const duration = document.getElementById('sessionDuration').value;
+
+        if (!courseId || courseId === 'Select Course' || !time || !duration)
+            return alert('Please select course, time, and duration.');
+
+        const courseName = courses[courseId] ? courses[courseId].name : courseId;
+        const dayName = getDayName(parseInt(day));
+
+        const scheduleKey = `${day}-${time.replace(':', '')}-${courseId}`;
+
+        db.ref(`weekly_schedule/${scheduleKey}`).set({
+            course_id: courseId,
+            course_name: courseName,
+            day_index: parseInt(day),
+            day_name: dayName,
+            start_time: time,
+            duration: parseInt(duration),
+        }).then(() => {
+            alert(`Session scheduled: ${courseName} on ${dayName} at ${time}!`);
+            loadWeeklySchedule(); 
+        }).catch(err => alert('Failed to schedule session: ' + err.message));
+    }
+
+    // 🔥 LOAD WEEKLY SCHEDULE (grouped by day with rowspan)
+    function loadWeeklySchedule() {
+        if (!db) return;
+        const output = document.getElementById('timetableOutput');
+        if (!output) return; 
+
+        output.innerHTML = 'Loading weekly schedule...'; 
+
+        db.ref('weekly_schedule').once('value').then(snap => {
+            weeklySchedule = snap.val() || {};
+            const sessionsArr = objToArray(weeklySchedule).sort(
+                (a, b) => a.day_index - b.day_index || a.start_time.localeCompare(b.start_time)
+            );
+            
+            if (sessionsArr.length === 0) {
+                output.innerHTML = `<p>No sessions scheduled yet. Please use the forms above to set up the timetable.</p>`;
+                return;
+            }
+
+            // Group sessions by day_index
+            const sessionsByDay = {};
+            sessionsArr.forEach(s => {
+                if (!sessionsByDay[s.day_index]) sessionsByDay[s.day_index] = [];
+                sessionsByDay[s.day_index].push(s);
+            });
+
+            let html = `<table>
+                <tr><th>Day</th><th>Course</th><th>Time</th><th>Duration (min)</th></tr>`;
+
+            const dayIndexes = Object.keys(sessionsByDay).map(Number).sort((a,b) => a - b);
+
+            dayIndexes.forEach(dayIdx => {
+                const daySessions = sessionsByDay[dayIdx];
+                const rowspan = daySessions.length;
+
+                daySessions.forEach((s, idx) => {
+                    html += `<tr>`;
+                    // Only put the day cell once per group, with appropriate rowspan
+                    if (idx === 0) {
+                        html += `<td rowspan="${rowspan}">${s.day_name}</td>`;
+                    }
+                    html += `
+                        <td>${s.course_name} (${s.course_id})</td>
+                        <td>${s.start_time}</td>
+                        <td>${s.duration}</td>
+                    </tr>`;
+                });
+            });
+
+            html += `</table>`;
+            output.innerHTML = html;
+        }).catch(err => {
+            console.error("Error loading schedule:", err);
+            output.innerHTML = 'Error loading schedule. Check Firebase connection/rules.';
+        });
+    }
+
+    // _________________________________________________________________
+    // 🚀 SECTION 4: FIREBASE HANDLERS (CORE)
+    // _________________________________________________________________
+
+    // 🔥 AUTHENTICATION
+    function handleSignIn() {
+        const email = document.getElementById('adminEmail').value;
+        const pass = document.getElementById('adminPass').value;
+        
+        if (!email || !pass) {
+            alert('Please enter both email and password.');
+            return;
+        }
+
+        firebase.auth().signInWithEmailAndPassword(email, pass)
+            .then(() => {
+                alert('Logged in successfully as Admin! Loading data...');
+                showApp('admin');
+            })
+            .catch((error) => {
+                console.error("Login Error:", error.message);
+                alert(`Login Failed: ${error.message}`);
+            });
+    }
+
+    // 🔥 ENROLL STUDENT
+    // function handleEnrollStudent() {
+    //     if (userRole !== 'admin' || !db) {
+    //         alert('Admin access or database required.');
+    //         return;
+    //     }
+
+    //     const name = document.getElementById('studentName').value;
+    //     const id = document.getElementById('studentId').value;
+    //     const branch = document.getElementById('studentBranch').value;
+    //     const photoFile = document.getElementById('studentPhoto').files[0];
+
+    //     if (!name || !id || !branch || !photoFile) {
+    //         alert('Please fill all required fields and select a photo.');
+    //         return;
+    //     }
+
+    //     const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+    //     const formData = new FormData();
+    //     formData.append('file', photoFile);
+    //     formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+    //     alert('Uploading photo... please wait.');
+
+    //     fetch(uploadUrl, { method: 'POST', body: formData })
+    //         .then(response => {
+    //             if (!response.ok) return response.json().then(errorData => {
+    //                 throw new Error(`Upload failed: ${errorData.error.message || 'Unknown error'}`);
+    //             });
+    //             return response.json();
+    //         })
+    //         .then(data => {
+    //             if (data.secure_url) {
+    //                 const downloadURL = data.secure_url;
+    //                 return db.ref('students/' + id).set({
+    //                     name: name,
+    //                     id: id,
+    //                     branch: branch,
+    //                     enrolled_time: new Date().toLocaleString(),
+    //                     photo_url: downloadURL
+    //                 });
+    //             } else {
+    //                 throw new Error('Cloudinary upload failed: Missing secure_url in response.');
+    //             }
+    //         })
+    //         .then(() => {
+    //             alert('Student enrolled successfully!');
+    //             document.getElementById('studentName').value = '';
+    //             document.getElementById('studentId').value = '';
+    //             document.getElementById('studentPhoto').value = '';
+    //             loadStudents(); 
+    //             loadCourses(); 
+    //         })
+    //         .catch(error => {
+    //             console.error("Enrollment CRITICAL FAILURE:", error);
+    //             alert('Enrollment failure: ' + error.message);
+    //         });
+    // }
+
+    // 🔥 UPDATED ENROLL STUDENT (With Per-Person Cloudinary Folders)
+function handleEnrollStudent() {
+    if (userRole !== 'admin' || !db) {
+        alert('Admin access or database required.');
+        return;
+    }
+
+    const name = document.getElementById('studentName').value;
+    const id = document.getElementById('studentId').value; // e.g., ECS70
+    const branch = document.getElementById('studentBranch').value;
+    const photoFile = document.getElementById('studentPhoto').files[0];
+
+    if (!name || !id || !branch || !photoFile) {
+        alert('Please fill all required fields and select a photo.');
+        return;
+    }
+
+    const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+    const formData = new FormData();
+    formData.append('file', photoFile);
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+    
+    // --- 🚀 THE FIX FOR PER-PERSON FOLDERS ---
+    // This tells Cloudinary: Create/Use folder 'attendance_photos/ECS70'
+    formData.append('folder', `attendance_photos/${id}`); 
+    // This names the file 'photo_1' inside that folder
+    formData.append('public_id', `photo_1`); 
+    // -----------------------------------------
+
+    alert('Uploading photo and creating student folder... please wait.');
+
+    fetch(uploadUrl, { method: 'POST', body: formData })
+        .then(response => {
+            if (!response.ok) return response.json().then(errorData => {
+                throw new Error(`Upload failed: ${errorData.error.message || 'Unknown error'}`);
+            });
+            return response.json();
+        })
+        .then(data => {
+            if (data.secure_url) {
+                const downloadURL = data.secure_url;
+                // Save details to Firebase
+                return db.ref('students/' + id).set({
+                    name: name,
+                    id: id,
+                    branch: branch,
+                    enrolled_time: new Date().toLocaleString(),
+                    photo_url: downloadURL
+                });
+            } else {
+                throw new Error('Cloudinary upload failed: Missing secure_url in response.');
+            }
+        })
+        .then(() => {
+            alert(`Success! Folder 'attendance_photos/${id}' created and student enrolled.`);
+            document.getElementById('studentName').value = '';
+            document.getElementById('studentId').value = '';
+            document.getElementById('studentPhoto').value = '';
+            loadStudents(); 
+        })
+        .catch(error => {
+            console.error("Enrollment CRITICAL FAILURE:", error);
+            alert('Enrollment failure: ' + error.message);
+        });
+}
+
+    // 🔥 DATA READ: STUDENTS 
+    function loadStudents() {
+        if (!db) return;
+
+        const box = document.querySelector('#students .box');
+        if (box) box.innerHTML = `<p>Loading enrolled students...</p>`;
+
+        db.ref('students').on('value', snap => {
+            students = objToArray(snap.val());
+
+            if (box) {
+                box.innerHTML =
+                    `<h3>Enrolled Students (${students.length})</h3>
+                    <table>
+                        <tr><th>Name</th><th>ID</th><th>Branch</th><th>Photo</th></tr>
+                        ${students.map(s => `
+                            <tr>
+                                <td>${s.name}</td>
+                                <td>${s.id}</td>
+                                <td>${s.branch}</td>
+                                <td><img src="${s.photo_url}" class="student-photo-preview"></td>
+                            </tr>`).join('')}
+                    </table>`;
+            }
+            updateDashboardSummary();
+        });
+    }
+    
+    // 🔥 DATA READ: LIVE SESSION LOGS 
+    function loadLiveSessionLogs() {
+        if (!db) return;
+        const list = document.querySelector('#attendance .box');
+        if (list) list.innerHTML = '<p>Loading real-time session logs...</p>';
+
+        db.ref('attendance_logs').orderByChild('timestamp').limitToLast(50).on('value', (snapshot) => {
+            sessionLogs = [];
+            snapshot.forEach((childSnapshot) => {
+                sessionLogs.unshift(childSnapshot.val());
+            });
+
+            let content = '<h3>Recent Session Logs (RPi/Face Detection Input)</h3>';
+            const logs = '<table><tr><th>Student ID</th><th>Status</th><th>Time</th><th>Course ID</th></tr>' +
+                (sessionLogs.length > 0 ? sessionLogs.map(a => 
+                    `<tr><td>${a.studentId}</td><td>${a.status}</td><td>${a.time}</td><td>${a.courseId || a.sessionId || 'UNKNOWN'}</td></tr>`
+                ).join('') : '<tr><td colspan="4">No recent session logs found.</td></tr>') +
+                '</table>';
+
+            if (list) list.innerHTML = content + logs;
+            updateDashboardSummary();
+        });
+    }
+
+    // 🔥 DASHBOARD DATA SUMMARY UPDATE
+    function updateDashboardSummary() {
+        const total = students.length;
+        const totalEl = document.querySelector('#dashboard .box:nth-child(1) p:nth-child(2) strong');
+        const presentEl = document.querySelector('#dashboard .box:nth-child(1) p:nth-child(3) strong');
+        const absentEl = document.querySelector('#dashboard .box:nth-child(1) p:nth-child(4) strong');
+        const lastEl = document.querySelector('#dashboard .box:nth-child(1) p:nth-child(5) strong');
+
+        if (totalEl) totalEl.textContent = total;
+
+        const today = new Date().toDateString();
+        const presentSet = new Set();
+        let latestTime = 'N/A';
+
+        sessionLogs.forEach(log => {
+            if (!log.time) return;
+
+            const logDate = new Date(log.time).toDateString();
+            if (log.status === "Present" && today === logDate) {
+                presentSet.add(log.studentId);
+                latestTime = log.time;
+            }
+        });
+
+        const presentCount = presentSet.size;
+        if (presentEl) presentEl.textContent = presentCount;
+        if (absentEl) absentEl.textContent = total - presentCount;
+        if (lastEl) lastEl.textContent = latestTime;
+
+        const dropdown = document.getElementById("studentSelect");
+        if (dropdown) {
+            dropdown.innerHTML =
+                `<option value="Select Student">Select Student</option>` +
+                students.map(s => `<option value="${s.id}">${s.name} (${s.id})</option>`).join('');
+        }
+    }
+
+    // 🔥 ANALYTICS: CALCULATE ATTENDANCE %
+    async function handleCalculate() {
+        if (!db || Object.keys(weeklySchedule).length === 0) {
+             document.getElementById('analyticsOutput').textContent = "Timetable data not loaded. Please log in as Admin and ensure courses/sessions are scheduled.";
+             return;
+        }
+
+        const studentId = document.getElementById('studentSelect').value;
+        const courseId = document.getElementById('dashboardSubjectSelect').value;
+        const monthDropdownValue = document.getElementById('monthSelect').value;
+        const output = document.getElementById('analyticsOutput');
+
+        if (!studentId || studentId === 'Select Student' || !courseId || courseId === 'Select Subject') {
+            output.textContent = `Please select a student and a subject.`;
+            return;
+        }
+
+        const studentDetails = students.find(s => s.id === studentId);
+        if (!studentDetails || !courses[courseId]) {
+            output.textContent = "Error: Student or Course data is missing.";
+            return;
+        }
+
+        output.textContent = `Calculating attendance for ${studentDetails.name} in ${courses[courseId].name} (${monthDropdownValue})...`;
+
+        const [monthName, year] = monthDropdownValue.split(' ');
+        const monthIndex = new Date(Date.parse(monthName + " 1, " + year)).getMonth();
+        const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+
+        let totalScheduledSessions = 0;
+        const sessionsForCourse = objToArray(weeklySchedule).filter(s => s.course_id === courseId);
+
+        for (let i = 1; i <= daysInMonth; i++) {
+            const date = new Date(year, monthIndex, i);
+            const dayOfWeek = date.getDay();
+            const scheduleDayIndex = dayOfWeek === 0 ? 7 : dayOfWeek;
+            
+            sessionsForCourse.forEach(session => {
+                if (session.day_index === scheduleDayIndex) {
+                    if (courses[courseId].branch === 'All' || courses[courseId].branch === studentDetails.branch) {
+                        totalScheduledSessions++;
+                    }
+                }
+            });
+        }
+        
+        const studentLogs = await db.ref('attendance_logs').once('value').then(snap => objToArray(snap.val()));
+        const sessionsAttended = new Set();
+        
+        studentLogs.forEach(log => {
+            const logDate = log.time ? log.time.split(',')[0] : '';
+            if (log.studentId === studentId && 
+                log.courseId === courseId && 
+                log.time && log.time.includes(monthName) && 
+                log.status === 'Present') 
+            {
+                 sessionsAttended.add(`${logDate}-${log.courseId}`);
+            }
+        });
+
+        const presentCount = sessionsAttended.size;
+        
+        const total = totalScheduledSessions || 1;
+        const percentage = (presentCount / total * 100).toFixed(2);
+        
+        output.innerHTML =
+            `<strong>Attendance for ${studentDetails.name} in ${courses[courseId].name}:</strong> 
+             <span style="font-size: 1.2em; color: ${percentage >= 75 ? 'green' : 'red'};">${percentage}%</span> 
+             (${presentCount} sessions attended / ${totalScheduledSessions} sessions scheduled)`;
+    }
+
+    // 🔥 REPORTS: GENERATE MONTHLY REPORT
+    async function generateMonthlyReport() {
+        const month = document.getElementById("reportMonth").value;
+        const out = document.getElementById("reportOutput");
+
+        if (!month) {
+            out.innerHTML = `<p>Please select a month (YYYY-MM).</p>`;
+            return;
+        }
+        if (Object.keys(weeklySchedule).length === 0) {
+             out.innerHTML = `<p>Error: Timetable data not loaded for calculation. Schedule some sessions first.</p>`;
+             return;
+        }
+
+        out.innerHTML = `<p>Generating detailed report for ${month}...</p>`;
+
+        const logs = await db.ref("attendance_logs").once("value").then(snap => objToArray(snap.val()));
+        const studentList = students;
+
+        const monthYear = month.substring(0, 7);
+        const [monthName, year] = [month.substring(5, 7), month.substring(0, 4)];
+        const monthIndex = parseInt(monthName) - 1;
+        const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+
+        const groupedByStudentAndCourse = {};
+
+        logs.filter(l => l.time && l.time.includes(monthYear)).forEach(l => {
+            const studentId = l.studentId;
+            const courseId = l.courseId || 'UNKNOWN';
+            
+            if (!groupedByStudentAndCourse[studentId]) groupedByStudentAndCourse[studentId] = {};
+            if (!groupedByStudentAndCourse[studentId][courseId]) {
+                groupedByStudentAndCourse[studentId][courseId] = { present: new Set(), total_scheduled: 0 };
+            }
+
+            if (l.status === "Present") {
+                const sessionKey = `${l.time.split(',')[0]}-${courseId}`; 
+                groupedByStudentAndCourse[studentId][courseId].present.add(sessionKey);
+            }
+        });
+        
+        Object.keys(groupedByStudentAndCourse).forEach(studentId => {
+            const studentDetails = studentList.find(s => s.id === studentId);
+            if (!studentDetails) return;
+
+            Object.keys(groupedByStudentAndCourse[studentId]).forEach(courseId => {
+                const sessionsForCourse = objToArray(weeklySchedule).filter(s => s.course_id === courseId);
+                let totalScheduled = 0;
+
+                for (let i = 1; i <= daysInMonth; i++) {
+                    const date = new Date(year, monthIndex, i);
+                    const dayOfWeek = date.getDay();
+                    const scheduleDayIndex = dayOfWeek === 0 ? 7 : dayOfWeek; 
+
+                    sessionsForCourse.forEach(session => {
+                        if (session.day_index === scheduleDayIndex) {
+                            if (courses[courseId] && (courses[courseId].branch === 'All' || courses[courseId].branch === studentDetails.branch)) {
+                                totalScheduled++;
+                            }
+                        }
+                    });
+                }
+                groupedByStudentAndCourse[studentId][courseId].total_scheduled = totalScheduled;
+            });
+        });
+
+        let html = `<h3>Monthly Attendance Summary (${month})</h3><table>
+            <tr><th>Student ID</th><th>Name</th><th>Course</th><th>Attended</th><th>Scheduled</th><th>Percentage</th></tr>`;
+
+        studentList.forEach(student => {
+            const studentId = student.id;
+            const studentName = student.name;
+            let studentHasData = false;
+            
+            Object.keys(groupedByStudentAndCourse[studentId] || {}).forEach(courseId => {
+                if (courseId === 'UNKNOWN') return;
+                studentHasData = true;
+                const data = groupedByStudentAndCourse[studentId][courseId];
+                const presentCount = data.present.size;
+                const totalScheduled = data.total_scheduled;
+                
+                const total = totalScheduled || 1; 
+                const pct = (presentCount / total * 100).toFixed(2);
+                const courseName = courses[courseId] ? courses[courseId].name : courseId;
+
+                html += `<tr>
+                    <td>${studentId}</td>
+                    <td>${studentName}</td>
+                    <td>${courseName}</td>
+                    <td>${presentCount}</td>
+                    <td>${totalScheduled}</td>
+                    <td style="color:${pct >= 75 ? 'green' : 'red'};"><strong>${pct}%</strong></td>
+                </tr>`;
+            });
+            
+            if (!studentHasData) {
+                 html += `<tr><td>${studentId}</td><td>${studentName}</td><td colspan="4">No valid course attendance logs found this month.</td></tr>`;
+            }
+        });
+
+        html += `</table>`;
+        out.innerHTML = html;
+    }
+
+    // FIX 2: Export Current Report as CSV
+    function handleExportCurrentReport() {
+        const reportOutput = document.getElementById('reportOutput');
+        if(!reportOutput || !reportOutput.querySelector('table')) {
+            alert('No generated report to export. Please generate a report first.');
+            return;
+        }
+
+        const table = reportOutput.querySelector('table');
+        let csv = [];
+        let rows = table.querySelectorAll('tr');
+        
+        for(let i = 0; i < rows.length; i++) {
+            let row = [], cols = rows[i].querySelectorAll('td, th');
+            
+            for(let j = 0; j < cols.length; j++) {
+                row.push(`"${cols[j].innerText.replace(/"/g, '""')}"`);
+            }
+            csv.push(row.join(','));
+        }
+
+        const blob = new Blob([csv.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const month = document.getElementById('reportMonth').value || 'attendance_report';
+        a.href = url;
+        a.download = `attendance_report_${month}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    // 🔥 COMMUNICATION: SEND BROADCAST
+    function handleSendBroadcast() {
+        if (userRole !== 'admin') return alert('Admin access required.');
+        if (!db) return;
+        const msg = document.getElementById('broadcastText').value;
+        if (msg) {
+            // Save to broadcasts with a unique key
+            const newBroadcastRef = db.ref('broadcasts').push();
+            newBroadcastRef.set({
+                message: msg,
+                time: new Date().toLocaleString(),
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            })
+            .then(() => {
+                // Also save to latest for backward compatibility
+                return db.ref('broadcasts/latest').set({
+                    message: msg,
+                    time: new Date().toLocaleString(),
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                });
+            })
+            .then(() => {
+                alert('Message broadcasted successfully!');
+                document.getElementById('broadcastText').value = '';
+                loadLatestBroadcast();
+                loadAllBroadcasts();
+            })
+            .catch(error => {
+                console.error("Broadcast failed:", error);
+                alert('Failed to send broadcast: ' + error.message);
+            });
+        } else {
+            alert('Please enter a message to broadcast.');
+        }
+    }
+
+    // 🔥 COMMUNICATION: LOAD ALL BROADCASTS (NEW FUNCTION)
+    function loadAllBroadcasts() {
+        if (!db) return;
+
+        db.ref('broadcasts').orderByChild('timestamp').limitToLast(50).on('value', (snapshot) => {
+            const data = snapshot.val();
+            const studentDisplay = document.getElementById('studentBroadcastContent');
+            
+            if (data) {
+                // Convert broadcasts to array and sort by timestamp (newest first)
+                const broadcasts = [];
+                Object.keys(data).forEach(key => {
+                    if (key !== 'latest') { // Skip the 'latest' entry
+                        broadcasts.push(data[key]);
+                    }
+                });
+                
+                // Sort by timestamp descending (newest first)
+                broadcasts.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+                
+                if (broadcasts.length > 0) {
+                    const content = broadcasts.map(broadcast => 
+                        `<div class="announcement-item">
+                            <p>${broadcast.message}</p>
+                            <small>(${broadcast.time})</small>
+                        </div>`
+                    ).join('');
+                    
+                    if (studentDisplay) studentDisplay.innerHTML = content;
+                } else {
+                    if (studentDisplay) studentDisplay.textContent = 'No announcements yet.';
+                }
+            } else {
+                if (studentDisplay) studentDisplay.textContent = 'No announcements yet.';
+            }
+        });
+    }
+
+    // 🔥 COMMUNICATION: LOAD LATEST BROADCAST (FOR ADMIN)
+    function loadLatestBroadcast() {
+        if (!db) return;
+
+        db.ref('broadcasts/latest').on('value', (snapshot) => {
+            const data = snapshot.val();
+            const adminDisplay = document.getElementById('latestBroadcast');
+            const studentDisplay = document.getElementById('studentBroadcastContent');
+
+            if (data) {
+                const content = `${data.message} <br><small>(${data.time})</small>`;
+                if (adminDisplay) adminDisplay.innerHTML = content;
+                // For backward compatibility, keep showing latest in student view if all broadcasts not loaded
+                if (studentDisplay && !studentDisplay.querySelector('.announcement-item')) {
+                    studentDisplay.innerHTML = `${data.message} <br><small>— Admin (${data.time})</small>`;
+                }
+            } else {
+                if (adminDisplay) adminDisplay.textContent = 'No announcements yet.';
+                if (studentDisplay) studentDisplay.textContent = 'Welcome! Waiting for admin announcement...';
+            }
+        });
+    }
+
+    // 🔥 COMMUNICATION: SUBMIT FEEDBACK
+    function handleSubmitFeedback() {
+        if (!db) return;
+        const text = document.getElementById('submitFeedbackText').value;
+        if (text) {
+            db.ref('feedbacks').push().set({
+                text: text,
+                time: new Date().toLocaleString(),
+                role: userRole
+            })
+                .then(() => {
+                    document.getElementById('submitFeedbackText').value = '';
+                    alert('Feedback submitted!');
+                    loadFeedbacks();
+                })
+                .catch((error) => {
+                    alert('Feedback submission failed: ' + error.message);
+                });
+        } else {
+            alert('Please enter your feedback.');
+        }
+    }
+
+    // 🔥 COMMUNICATION: LOAD FEEDBACKS
+    function loadFeedbacks() {
+        if (!db) return;
+        const list = document.getElementById('feedbackList');
+        if (!list) return;
+
+        list.innerHTML = '<li>Loading feedbacks...</li>';
+
+        db.ref('feedbacks').once('value')
+            .then((snapshot) => {
+                const feedbacks = objToArray(snapshot.val());
+                const feedbackHtml = feedbacks.reverse().map(f => `<li><strong>(${f.role})</strong>: ${f.text} <br><small>${f.time}</small></li>`).join('') || '<li>No feedback yet</li>';
+                list.innerHTML = feedbackHtml;
+            })
+            .catch((error) => {
+                console.error("Error reading feedbacks from Firebase:", error);
+                list.innerHTML = '<li>Error loading feedbacks.</li>';
+            });
+    }
+
+    // 🔥 DATA UTILITY: EXPORT CSV
+    function handleExport() {
+        if (userRole !== 'admin' || !db) return alert('Admin login required for full data export.');
+
+        db.ref('attendance_logs').once('value')
+            .then((snapshot) => {
+                let csv = 'Student ID,Status,Time,Course ID\n';
+                snapshot.forEach((childSnapshot) => {
+                    const a = childSnapshot.val();
+                    const courseId = a.courseId || a.sessionId || 'UNKNOWN'; 
+                    csv += `${a.studentId},${a.status},"${a.time.replace(/"/g, '""')}","${courseId}"\n`;
+                });
+
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'attendance_timetable_export.csv';
+                a.click();
+                URL.revokeObjectURL(url);
+            })
+            .catch((error) => {
+                alert('Export failed: ' + error.message);
+            });
+    }
+
+    // 🔥 PASSWORD TOGGLE FUNCTIONALITY
+    function togglePasswordVisibility() {
+        const passwordInput = document.getElementById('adminPass');
+        const toggleButton = document.getElementById('togglePassword');
+        
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            toggleButton.innerHTML = '&#128064;'; // Eye with a slash
+        } else {
+            passwordInput.type = 'password';
+            toggleButton.innerHTML = '&#128065;'; // Regular eye
+        }
+    }
+
+
+    // _________________________________________________________________
+    // 🚀 SECTION 5: EVENT LISTENERS & INITIALIZATION
+    // _________________________________________________________________
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Auth Handlers
+        document.getElementById('signInBtn').addEventListener('click', handleSignIn);
+        document.getElementById('signUpBtn').addEventListener('click', () => alert('Sign up not implemented yet.'));
+        document.getElementById('studentAccessBtn').addEventListener('click', () => {
+            alert('Continuing as Student (View Only).');
+            showApp('student');
+        });
+
+        // Password Toggle
+        document.getElementById('togglePassword').addEventListener('click', togglePasswordVisibility);
+
+        // Admin & Utility Handlers
+        document.getElementById('enrollBtn').addEventListener('click', handleEnrollStudent);
+        document.getElementById('sendBroadcastBtn').addEventListener('click', handleSendBroadcast);
+        document.getElementById('refreshBtn').addEventListener('click', () => location.reload());
+        document.getElementById('exportBtn').addEventListener('click', handleExport);
+        document.getElementById('calculateBtn').addEventListener('click', handleCalculate);
+
+        // Timetable Handlers
+        const addCourseBtn = document.getElementById('addCourseBtn');
+        if(addCourseBtn) addCourseBtn.addEventListener('click', handleAddCourse);
+
+        const addSessionBtn = document.getElementById('addSessionBtn');
+        if(addSessionBtn) addSessionBtn.addEventListener('click', handleAddSession);
+
+        // General Handlers
+        document.getElementById('submitFeedbackBtn').addEventListener('click', handleSubmitFeedback);
+        
+        // FIX 2: Reports Section Event Listeners
+        const generateMonthlyReportBtn = document.getElementById('generateMonthlyReportBtn');
+        if(generateMonthlyReportBtn) generateMonthlyReportBtn.addEventListener('click', () => {
+            const monthEl = document.getElementById('reportMonth');
+            const monthDisplayEl = document.getElementById('reportMonthDisplay');
+            if(monthEl && monthDisplayEl) {
+                monthDisplayEl.textContent = monthEl.value;
+                generateMonthlyReport();
+            }
+        });
+        
+        const downloadReportCsvBtn = document.getElementById('downloadReportCsvBtn');
+        if(downloadReportCsvBtn) downloadReportCsvBtn.addEventListener('click', handleExportCurrentReport);
+        
+        const exportAllLogsBtn = document.getElementById('exportAllLogsBtn');
+        if(exportAllLogsBtn) exportAllLogsBtn.addEventListener('click', handleExport);
+        
+        const exportCurrentReportBtn = document.getElementById('exportCurrentReportBtn');
+        if(exportCurrentReportBtn) exportCurrentReportBtn.addEventListener('click', handleExportCurrentReport);
+
+        window.generateMonthlyReport = generateMonthlyReport;
+
+        populateDynamicMonths();
+
+        loadLatestBroadcast();
+    });
+</script>
+
+</body>
+</html>

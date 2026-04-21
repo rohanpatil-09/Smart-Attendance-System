@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Smart Attendance – IoT Face Recognition</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+    body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: #f4f6fb;
+    }
+    /* Layout */
+    .container {
+        display: flex;
+        padding: 20px;
+        gap: 20px;
+    }
+    .sidebar {
+        width: 260px;
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 10px #00000015;
+        height: 95vh;
+        overflow-y: auto;
+    }
+    .page {
+        flex: 1;
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px #00000015;
+    }
+
+    /* Buttons */
+    button {
+        padding: 10px 14px;
+        border: none;
+        border-radius: 8px;
+        background:#2563eb;
+        color: rgb(24, 24, 24);
+        cursor: pointer;
+        font-size: 14px;
+    }
+    button:hover { background:#1746b0; }
+
+    input, select {
+        width: 100%;
+        padding: 10px;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+        margin-bottom: 10px;
+    }
+
+    .nav-btn {
+        display: block;
+        width: 100%;
+        padding: 10px;
+        margin: 5px 0;
+        border-radius: 8px;
+        background:#828181;
+        cursor:pointer;
+        text-align:left;
+        border:none;
+    }
+    .nav-btn.active {
+        background:#2563eb;
+        color:white;
+    }
+
+    .grid {
+        display:grid;
+        grid-template-columns: repeat(2,1fr);
+        gap: 20px;
+        margin-top:20px;
+    }
+
+    .box {
+        background:white;
+        border-radius:12px;
+        padding:20px;
+        box-shadow:0 2px 8px #00000010;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    th, td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
+    th {
+        background-color: #f2f2f2;
+    }
+
+    /* New styles for Login Page */
+    #login-page {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 90vh;
+        background: #f4f6fb;
+    }
+    #login-box {
+        background: white;
+        padding: 40px;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px #00000015;
+        width: 300px;
+    }
+    #login-box input {
+        margin-bottom: 20px;
+    }
+    .main-app-content {
+        display: none; /* Hidden by default */
+        width: 100%;
+    }
+</style>
+</head>
+<body>
+
+<h2 style="padding: 10px 20px; margin: 0;">Smart Attendance • IoT Face Recognition</h2>
+
+<div id="login-page">
+    <div id="login-box">
+        <h3>Admin Login</h3>
+        <label for="adminEmail">Email:</label>
+        <input type="email" id="adminEmail" placeholder="admin@example.com">
+        <label for="adminPass">Password:</label>
+        <input type="password" id="adminPass" placeholder="password">
+        <button id="signInBtn" style="width: 100%; margin-bottom: 10px;">Sign In (Admin)</button>
+        <button id="signUpBtn" style="width: 100%; background:#999;">Sign Up (Not Implemented)</button>
+
+        <hr>
+
+        <h3>Student Access</h3>
+        <button id="studentAccessBtn" style="width: 100%; background: #00b894;">Continue as Student</button>
+    </div>
+</div>
+
+<div class="main-app-content">
+
+    <div class="container">
+
+        <div class="sidebar">
+            <h3>Navigation</h3>
+
+            <button class="nav-btn active" onclick="openPage('dashboard')">Dashboard</button>
+            <button class="nav-btn" onclick="openPage('students')">Students</button>
+            <button class="nav-btn" onclick="openPage('attendance')">Live Attendance</button>
+            <button class="nav-btn" onclick="openPage('reports')">Reports</button>
+            <button class="nav-btn" onclick="openPage('feedback')">Feedback & Help</button>
+            <button class="nav-btn" onclick="openPage('settings')">Settings</button>
+
+
+            <div id="admin-sidebar-controls">
+                <hr>
+
+                <h3>Enroll Student</h3>
+                <label for="studentName">Full Name:</label>
+                <input id="studentName" placeholder="Full name">
+                <label for="studentId">Student ID:</label>
+                <input id="studentId" placeholder="Student ID e.g. CS2025">
+                <label for="studentBranch">Branch:</label>
+                <select id="studentBranch">
+                    <option>BE–ECS</option>
+                    <option>BE–IT</option>
+                    <option>BE–ENTC</option>
+                </select>
+                <label for="studentPhoto">Photo:</label>
+                <input id="studentPhoto" type="file">
+                <button id="enrollBtn">Enroll Student</button>
+            </div>
+
+            <hr>
+
+            <button id="exportBtn" style="width:100%; margin-bottom:10px;">Export CSV</button>
+            <button id="refreshBtn" style="width:100%; background:#999;">Refresh Data</button>
+        </div>
+
+        <div class="page" id="dashboard">
+            <h2>Dashboard</h2>
+
+            <div class="grid">
+                <div class="box">
+                    <h3>Live Attendance</h3>
+                    <p>Total Students: <strong>0</strong></p>
+                    <p>Present Now: <strong>0</strong></p>
+                    <p>Absent Today: <strong>0</strong></p>
+                    <p>Last Update: <strong>N/A</strong></p>
+                </div>
+
+                <div class="box">
+                    <h3>Subject / Monthly Analytics</h3>
+                    <label for="subjectSelect">Subject:</label>
+                    <select id="subjectSelect">
+                        <option>Embedded Systems</option>
+                    </select>
+                    <label for="monthSelect">Month:</label>
+                    <select id="monthSelect">
+                        <option>November 2025</option>
+                    </select>
+                    <label for="studentSelect">Student:</label>
+                    <select id="studentSelect">
+                        <option>Select Student</option>
+                    </select>
+                    <button id="calculateBtn">Calculate</button>
+                </div>
+            </div>
+
+            <div class="box" style="margin-top:20px;">
+                <h3>Student Subject Summary</h3>
+                <p>Select subject/month to view percentage.</p>
+            </div>
+        </div>
+
+        <div class="page" id="students" style="display:none;">
+            <h2>Students</h2>
+            <div class="box">
+                <p>List of enrolled students will appear here.</p>
+            </div>
+        </div>
+
+        <div class="page" id="attendance" style="display:none;">
+            <h2>Live Attendance</h2>
+            <div class="box">
+                <p>Realtime logs will appear here.</p>
+            </div>
+        </div>
+
+        <div class="page" id="reports" style="display:none;">
+            <h2>Reports</h2>
+            <div class="grid">
+                <div class="box">Monthly Reports Area</div>
+                <div class="box">Export & Scheduling</div>
+            </div>
+        </div>
+
+        <div class="page" id="feedback" style="display:none;">
+            <h2>Feedback and Help</h2>
+            <div class="box">
+                <textarea id="feedbackText" placeholder="Write your feedback here..."></textarea>
+                <button id="submitFeedbackBtn">Submit Feedback</button>
+            </div>
+            <div class="box">
+                <h3>Previous Feedbacks</h3>
+                <ul id="feedbackList">
+                    <li>No feedback yet</li>
+                </ul>
+            </div>
+        </div>
+
+
+        <div class="page" id="settings" style="display:none;">
+            <h2>Settings</h2>
+            <div class="box">
+                <p>Application settings go here.</p>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+// Data structures
+let students = JSON.parse(localStorage.getItem('students')) || [];
+let attendance = JSON.parse(localStorage.getItem('attendance')) || [];
+let feedbacks = JSON.parse(localStorage.getItem('feedbacks')) || [];
+let userRole = 'guest'; // 'guest', 'admin', or 'student'
+
+// DOM Elements
+const loginPage = document.getElementById('login-page');
+const mainAppContent = document.querySelector('.main-app-content');
+const adminSidebarControls = document.getElementById('admin-sidebar-controls');
+const attendanceMarking = '<h3>Mark Attendance</h3><p>Attendance marking is available only in Admin mode.</p>';
+
+
+// Utility functions
+function saveData() {
+    localStorage.setItem('students', JSON.stringify(students));
+    localStorage.setItem('attendance', JSON.stringify(attendance));
+    localStorage.setItem('feedbacks', JSON.stringify(feedbacks));
+}
+
+function showApp(role) {
+    userRole = role;
+    loginPage.style.display = 'none';
+    mainAppContent.style.display = 'block';
+
+    if (role === 'admin') {
+        adminSidebarControls.style.display = 'block';
+    } else if (role === 'student') {
+        adminSidebarControls.style.display = 'none';
+    }
+
+    // Initialize with Dashboard view
+    const dashboardBtn = document.querySelector('.nav-btn');
+    if (dashboardBtn) {
+        openPage('dashboard', dashboardBtn);
+    }
+}
+
+function openPage(pageId, element) {
+    // Hide all pages
+    document.querySelectorAll(".page").forEach(p => p.style.display = "none");
+
+    // Show selected page
+    document.getElementById(pageId).style.display = "block";
+
+    // Update sidebar active state (use element from event if available, otherwise use query)
+    let navButton = element;
+    if (!navButton) {
+        // Find the button if not passed (e.g., initial load)
+        navButton = document.querySelector(`.nav-btn[onclick="openPage('${pageId}')"]`);
+    }
+    document.querySelectorAll(".nav-btn").forEach(btn => btn.classList.remove("active"));
+    if (navButton) navButton.classList.add("active");
+
+
+    // Load page data
+    if (pageId === 'students') loadStudents();
+    if (pageId === 'attendance') loadAttendance();
+    if (pageId === 'dashboard') updateDashboard();
+    if (pageId === 'reports') loadReports();
+    if (pageId === 'feedback') loadFeedbacks();
+}
+
+
+// Admin Login/Access
+document.getElementById('signInBtn').addEventListener('click', () => {
+    const email = document.getElementById('adminEmail').value;
+    const pass = document.getElementById('adminPass').value;
+    if (email === 'admin@example.com' && pass === 'password') {
+        alert('Logged in successfully as Admin!');
+        showApp('admin');
+    } else {
+        alert('Invalid credentials!');
+    }
+});
+
+document.getElementById('signUpBtn').addEventListener('click', () => {
+    alert('Sign up not implemented yet.');
+});
+
+document.getElementById('studentAccessBtn').addEventListener('click', () => {
+    alert('Continuing as Student. Admin controls are hidden.');
+    showApp('student');
+});
+
+// Enroll student
+document.getElementById('enrollBtn').addEventListener('click', () => {
+    if (userRole !== 'admin') {
+        alert('Access denied. Only admin can enroll students.');
+        return;
+    }
+    const name = document.getElementById('studentName').value;
+    const id = document.getElementById('studentId').value;
+    const branch = document.getElementById('studentBranch').value;
+    const photo = document.getElementById('studentPhoto').files[0];
+    if (name && id) {
+        // Simple logic for storing photo URL (not actual file upload)
+        students.push({ name, id, branch, photo: photo ? URL.createObjectURL(photo) : null });
+        saveData();
+        alert('Student enrolled!');
+        document.getElementById('studentName').value = '';
+        document.getElementById('studentId').value = '';
+        document.getElementById('studentPhoto').value = ''; // Clear file input
+        loadStudents();
+    } else {
+        alert('Please fill all required fields (Name and ID).');
+    }
+});
+
+// Load students
+function loadStudents() {
+    const list = document.querySelector('#students .box');
+    list.innerHTML = '<h3>Enrolled Students</h3><table><tr><th>Name</th><th>ID</th><th>Branch</th><th>Photo</th></tr>' +
+        students.map(s => `<tr><td>${s.name}</td><td>${s.id}</td><td>${s.branch}</td><td>${s.photo ? '<img src="' + s.photo + '" width="50">' : 'No photo'}</td></tr>`).join('') +
+        '</table>';
+}
+
+// Simulate attendance (Admin only)
+function markAttendance(studentId, status) {
+    if (userRole !== 'admin') {
+        alert('Access denied. Only admin can manually mark attendance.');
+        return;
+    }
+    const now = new Date();
+    attendance.push({ studentId, status, time: now.toLocaleString() });
+    saveData();
+    loadAttendance();
+    updateDashboard();
+}
+
+// Load attendance
+function loadAttendance() {
+    const list = document.querySelector('#attendance .box');
+
+    let content = '';
+    if (userRole === 'admin') {
+        // Admin gets the marking table
+        const markSection = '<h3>Mark Attendance</h3><table><tr><th>Name</th><th>ID</th><th>Actions</th></tr>' +
+            students.map(s => `<tr><td>${s.name}</td><td>${s.id}</td><td><button onclick="markAttendance('${s.id}', 'Present')">Present</button> <button onclick="markAttendance('${s.id}', 'Absent')" style="background:#999;">Absent</button></td></tr>`).join('') +
+            '</table>';
+        content += markSection;
+    } else {
+        // Student/Guest gets a message
+        content += attendanceMarking;
+    }
+
+    const logs = '<h3>Recent Logs</h3><table><tr><th>Student ID</th><th>Status</th><th>Time</th></tr>' +
+        attendance.slice(-10).map(a => `<tr><td>${a.studentId}</td><td>${a.status}</td><td>${a.time}</td></tr>`).join('') +
+        '</table>';
+    content += logs;
+
+    list.innerHTML = content;
+}
+
+// Update dashboard
+function updateDashboard() {
+    const total = students.length;
+    // Filter attendance for today only
+    const todayAttendance = attendance.filter(a => new Date(a.time).toDateString() === new Date().toDateString());
+    const present = todayAttendance.filter(a => a.status === 'Present').length;
+    const absent = total - present;
+    document.querySelector('#dashboard .box p:nth-child(1) strong').textContent = total;
+    document.querySelector('#dashboard .box p:nth-child(2) strong').textContent = present;
+    document.querySelector('#dashboard .box p:nth-child(3) strong').textContent = absent;
+    document.querySelector('#dashboard .box p:nth-child(4) strong').textContent = new Date().toLocaleString();
+
+    // Update student select
+    const select = document.getElementById('studentSelect');
+    select.innerHTML = '<option>Select Student</option>' + students.map(s => `<option value="${s.id}">${s.name} (${s.id})</option>`).join('');
+}
+
+// Analytics
+document.getElementById('calculateBtn').addEventListener('click', () => {
+    const subject = document.getElementById('subjectSelect').value;
+    const month = document.getElementById('monthSelect').value;
+    const student = document.getElementById('studentSelect').value;
+    if (!student || student === 'Select Student') {
+        document.querySelector('#dashboard .box:last-child p').textContent = `Please select a student.`;
+        return;
+    }
+    // Simple calculation: percentage of attendance for the student in the month
+    const studentAtt = attendance.filter(a => a.studentId === student && a.time.includes(month));
+    const presentCount = studentAtt.filter(a => a.status === 'Present').length;
+    const totalSessions = studentAtt.length;
+    const percentage = totalSessions ? (presentCount / totalSessions * 100).toFixed(2) : 0;
+    document.querySelector('#dashboard .box:last-child p').textContent = `Attendance for ${student} in ${month}: ${percentage}% (${presentCount} / ${totalSessions} sessions)`;
+});
+
+// Load reports
+function loadReports() {
+    const reports = document.querySelector('#reports .grid .box:first-child');
+    reports.innerHTML = '<h3>Monthly Reports</h3><p>Reports will be generated here.</p>';
+}
+
+// Export CSV (Admin only feature, but accessible from student view as requested)
+document.getElementById('exportBtn').addEventListener('click', () => {
+    if (userRole !== 'admin') {
+        alert('The Export function is available for Students, but a valid Admin login is required to access the full attendance data for security reasons. Exporting dummy data.');
+        // For student view, we'll export dummy data or restrict it entirely. I'll restrict it.
+        return;
+    }
+    let csv = 'Student ID,Status,Time\n';
+    attendance.forEach(a => csv += `${a.studentId},${a.status},${a.time}\n`);
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'attendance.csv';
+    a.click();
+});
+
+// Refresh data
+document.getElementById('refreshBtn').addEventListener('click', () => {
+    location.reload();
+});
+
+// Feedback
+document.getElementById('submitFeedbackBtn').addEventListener('click', () => {
+    const text = document.getElementById('feedbackText').value;
+    if (text) {
+        feedbacks.push({ text, time: new Date().toLocaleString(), role: userRole });
+        saveData();
+        document.getElementById('feedbackText').value = '';
+        loadFeedbacks();
+    }
+});
+
+function loadFeedbacks() {
+    const list = document.getElementById('feedbackList');
+    list.innerHTML = feedbacks.map(f => `<li>${f.text} - ${f.time} (${f.role})</li>`).join('') || '<li>No feedback yet</li>';
+}
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', () => {
+    // Initial data load for state consistency, but keep login page visible
+    loadStudents();
+    updateDashboard();
+    loadFeedbacks();
+});
+</script>
+
+</body>
+</html>

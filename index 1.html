@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Smart Attendance – IoT Face Recognition</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <style>
+        /* BASE & LAYOUT */
+        body { margin: 0; font-family: Arial, sans-serif; background: #f4f6fb; }
+        .container { display: flex; padding: 20px; gap: 20px; }
+        .sidebar {
+            width: 260px; background: white; border-radius: 12px; padding: 20px;
+            box-shadow: 0 2px 10px #00000015; height: 95vh; overflow-y: auto;
+        }
+        .page {
+            flex: 1; background: white; padding: 20px; border-radius: 12px;
+            box-shadow: 0 2px 10px #00000015;
+        }
+
+        /* INPUTS & BUTTONS */
+        button {
+            padding: 10px 14px; border: none; border-radius: 8px; background: #2563eb;
+            color: white; cursor: pointer; font-size: 14px; transition: background 0.2s;
+        }
+        button:hover { background: #1746b0; }
+        input, select, textarea {
+            width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc;
+            margin-bottom: 10px; box-sizing: border-box;
+        }
+        textarea { min-height: 100px; }
+
+        /* NAVIGATION */ 
+        .nav-btn {
+            display: block; width: 100%; padding: 10px; margin: 5px 0; border-radius: 8px;
+            background: #828181; cursor: pointer; text-align: left; border: none; color: white;
+        }
+        .nav-btn.active { background: #2563eb; color: white; }
+
+        /* GRID & BOXES */
+        .grid {
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 20px;
+        }
+        .box {
+            background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px #00000010;
+        }
+
+        /* TABLES */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .student-photo-preview {
+            width: 50px; height: 50px; object-fit: cover; border-radius: 4px; vertical-align: middle;
+        }
+
+        /* STUDENT/BROADCAST SPECIFIC */
+        #broadcast-msg { background: #f0f0f0; padding: 20px; border-radius: 6px; margin-bottom: 20px; }
+
+        /* LOGIN PAGE */
+        #login-page {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 90vh; background: #f4f6fb;
+        }
+        #login-box {
+            background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px #00000015;
+            width: 300px;
+        }
+        #login-box input { margin-bottom: 20px; }
+        .main-app-content { display: none; width: 100%; }
+    </style>
+</head>
+<body>
+
+    <h2 style="padding: 10px 20px; margin: 0;">Smart Attendance • IoT Face Recognition</h2>
+
+    <div id="login-page">
+        <div id="login-box">
+            <h3>Admin Login</h3>
+            <label for="adminEmail">Email:</label>
+            <input type="email" id="adminEmail" placeholder="admin@example.com">
+            <label for="adminPass">Password:</label>
+            <input type="password" id="adminPass" placeholder="password">
+            <button id="signInBtn" style="width: 100%; margin-bottom: 10px;">Sign In (Admin)</button>
+            <button id="signUpBtn" style="width: 100%; background:#999;">Sign Up (Not Implemented)</button>
+
+            <hr>
+
+            <h3>Student Access</h3>
+            <button id="studentAccessBtn" style="width: 100%; background: #00b894;">Continue as Student (View Broadcast)</button>
+        </div>
+    </div>
+
+    <div class="main-app-content">
+        <div class="container">
+
+            <div class="sidebar">
+                <h3>Navigation</h3>
+                
+                <button class="nav-btn active" onclick="openPage('dashboard', this)">Dashboard</button>
+                <button class="nav-btn" onclick="openPage('student-dashboard', this)">Student View</button>
+                <button class="nav-btn" onclick="openPage('students', this)">Students</button>
+                <button class="nav-btn" onclick="openPage('attendance', this)">Live Attendance</button>
+                <button class="nav-btn" onclick="openPage('reports', this)">Reports</button>
+                <button class="nav-btn" onclick="openPage('feedback', this)">Feedback & Messaging</button>
+                <button class="nav-btn" onclick="openPage('settings', this)">Settings</button>
+
+                <div id="admin-sidebar-controls" style="display: none;">
+                    <hr>
+                    <h3>Enroll Student</h3>
+                    <label for="studentName">Full Name:</label>
+                    <input id="studentName" placeholder="Full name">
+                    <label for="studentId">Student ID:</label>
+                    <input id="studentId" placeholder="Student ID e.g. CS2025">
+                    <label for="studentBranch">Branch:</label>
+                    <select id="studentBranch">
+                        <option>BE–ECS</option>
+                        <option>BE–CSE</option>
+                        <option>BE–ENTC</option>
+                        <option>BE–ECE</option>
+                        <option>BE–AI&DS</option>
+                    </select>
+                    <label for="studentPhoto">Photo:</label>
+                    <input id="studentPhoto" type="file" accept="image/*">
+                    <button id="enrollBtn">Enroll Student</button>
+                </div>
+
+                <hr>
+
+                <button id="exportBtn" style="width:100%; margin-bottom:10px;">Export CSV</button>
+                <button id="refreshBtn" style="width:100%; background:#999;">Refresh Data</button>
+            </div>
+
+            <div class="page" id="dashboard">
+                <h2>Admin Dashboard</h2>
+
+                <div class="grid">
+                    <div class="box">
+                        <h3>Live Attendance Summary</h3>
+                        <p>Total Students: <strong>0</strong></p>
+                        <p>Present Now: <strong>0</strong></p>
+                        <p>Absent Today: <strong>0</strong></p>
+                        <p>Last Update: <strong>N/A</strong></p>
+                    </div>
+
+                    <div class="box">
+                        <h3>Analytics / Student Details</h3>
+                        <label for="subjectSelect">Subject:</label>
+                        <select id="subjectSelect">
+                            <option>Embedded Systems</option>
+                            <option>Machine Learning</option>
+                            <option>Deep Learning</option>
+                            <option>DevOps</option>
+                            <option>IoT</option>
+                            <option>Java Programming</option>
+                        </select>
+                        <label for="monthSelect">Month:</label>
+                        <select id="monthSelect">
+                            <option>November 2025</option>
+                            <option>December 2025</option>
+                        </select>
+                        <label for="studentSelect">Student:</label>
+                        <select id="studentSelect">
+                            <option>Select Student</option>
+                        </select>
+                        <button id="calculateBtn">Calculate Attendance %</button>
+                    </div>
+                </div>
+                
+                <div class="box" style="margin-top:20px;">
+                    <h3>Student Subject Summary</h3>
+                    <p id="analyticsOutput">Select subject/month to view percentage.</p>
+                </div>
+            </div>
+            
+            <div class="page" id="student-dashboard" style="display:none;">
+                <h2>Student Dashboard</h2>
+                <div id="broadcast-msg">
+                    <h4>📢 Latest Announcement</h4>
+                    <p id="studentBroadcastContent">Loading latest announcement...</p>
+                </div>
+                <div class="box" style="margin-top:20px;">
+                    <h3>My Attendance Summary</h3>
+                    <p>To implement personal summary, the student would need to log in individually (not as a guest) to fetch their attendance records.</p>
+                </div>
+            </div>
+
+            <div class="page" id="students" style="display:none;">
+                <h2>Enrolled Students</h2>
+                <div class="box">
+                    <p>List of enrolled students will appear here.</p>
+                </div>
+            </div>
+
+            <div class="page" id="attendance" style="display:none;">
+                <h2>Live Attendance Log (RPi Input)</h2>
+                <div class="box">
+                    <p>Logs from the automatic face recognition system will appear here. </p>
+                </div>
+            </div>
+
+            <div class="page" id="reports" style="display:none;">
+                <h2>Reports</h2>
+                <div class="grid">
+                    <div class="box">
+                        <h3>Monthly Reports</h3>
+                        <p>Reports will be generated here using data from the database.</p>
+                    </div>
+                    <div class="box">Export & Scheduling</div>
+                </div>
+            </div>
+
+            <div class="page" id="feedback" style="display:none;">
+                <h2>Feedback & Messaging</h2>
+                
+                <div id="adminBroadcastBlock" class="box" style="margin-top:10px; display:none;">
+                    <h3>Admin Broadcast Center (Send Message to Students)</h3>
+                    <textarea id="broadcastText" placeholder="Write your announcement here..."></textarea>
+                    <button id="sendBroadcastBtn" style="width:100%; background:#ff7f00;">Send Message</button>
+
+                    <div style="margin-top:15px; padding:10px; background:#e6f7ff; border-radius:4px;">
+                        <h4>Latest Message Sent:</h4>
+                        <p id="latestBroadcast">Loading...</p>
+                    </div>
+                </div>
+
+                <div class="box" style="margin-top: 20px;">
+                    <h3>Student Feedback Received (Admin View)</h3>
+                    <ul id="feedbackList">
+                        <li>Loading student feedbacks...</li>
+                    </ul>
+                </div>
+                
+                <div class="box" style="margin-top: 20px;">
+                    <h3>Submit General Feedback (All Users)</h3>
+                    <textarea id="submitFeedbackText" placeholder="Write your feedback here..."></textarea>
+                    <button id="submitFeedbackBtn">Submit Feedback</button>
+                </div>
+            </div>
+
+            <div class="page" id="settings" style="display:none;">
+                <h2>Settings</h2>
+                <div class="box">
+                    <p>Application settings go here.</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // _________________________________________________________________
+        // 🚀 SECTION 1: CONFIGURATION & INITIALIZATION
+        // _________________________________________________________________
+
+        // 🔥 CLOUDINARY CONFIGURATION
+        const CLOUDINARY_CLOUD_NAME = "damkuyllx";
+        const CLOUDINARY_UPLOAD_PRESET = "attendance_upload";
+
+        // 🔥 FIREBASE CONFIGURATION
+        const firebaseConfig = {
+            apiKey: "AIzaSyAuh70XAWrm6CbQpDAVqFRvJVkaIlbyLc8",
+            authDomain: "smart-attendance-system-143d4.firebaseapp.com",
+            databaseURL: "https://smart-attendance-system-143d4-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "smart-attendance-system-143d4",
+            storageBucket: "smart-attendance-system-143d4.firebasestorage.app",
+            messagingSenderId: "742939794516",
+            appId: "1:742939794516:web:3da3d39603f3064431a1c1"
+        };
+
+        // Initialize Firebase
+        let db = null;
+        if (typeof firebase !== 'undefined' && typeof firebase.initializeApp === 'function') {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.database();
+        } else {
+            console.error("Firebase SDK not initialized. Ensure script tags loaded correctly.");
+        }
+
+        // Global State
+        let students = [];
+        let attendance = [];
+        let feedbacks = [];
+        let userRole = 'guest';
+
+        // DOM References
+        const loginPage = document.getElementById('login-page');
+        const mainAppContent = document.querySelector('.main-app-content');
+        const adminSidebarControls = document.getElementById('admin-sidebar-controls');
+        const adminBroadcastBlock = document.getElementById('adminBroadcastBlock');
+
+
+        // _________________________________________________________________
+        // 🚀 SECTION 2: UI NAVIGATION & UTILITY
+        // _________________________________________________________________
+
+        function showApp(role) {
+            userRole = role;
+            loginPage.style.display = 'none';
+            mainAppContent.style.display = 'block';
+
+            if (role === 'admin') {
+                adminSidebarControls.style.display = 'block';
+                adminBroadcastBlock.style.display = 'block'; // Show broadcast for Admin
+                openPage('dashboard', document.querySelector('.nav-btn[onclick*="dashboard"]'));
+            } else if (role === 'student') {
+                adminSidebarControls.style.display = 'none';
+                adminBroadcastBlock.style.display = 'none'; // Hide broadcast input for Student
+                openPage('student-dashboard', document.querySelector('.nav-btn[onclick*="student-dashboard"]'));
+            }
+        }
+
+        function openPage(pageId, element) {
+            // Hide all pages
+            document.querySelectorAll(".page").forEach(p => p.style.display = "none");
+            // Show the selected page
+            document.getElementById(pageId).style.display = "block";
+
+            // Update active navigation button
+            let navButton = element;
+            if (!navButton) {
+                navButton = document.querySelector(`.nav-btn[onclick*="${pageId}"]`);
+            }
+            document.querySelectorAll(".nav-btn").forEach(btn => btn.classList.remove("active"));
+            if (navButton) navButton.classList.add("active");
+
+
+            // Dynamic content loading
+            if (pageId === 'students') loadStudents();
+            if (pageId === 'attendance') loadAttendance();
+            if (pageId === 'dashboard') updateDashboard();
+            if (pageId === 'student-dashboard') loadLatestBroadcast();
+            if (pageId === 'reports') loadReports();
+            if (pageId === 'feedback') { loadFeedbacks(); loadLatestBroadcast(); }
+        }
+
+        // _________________________________________________________________
+        // 🚀 SECTION 3: FIREBASE HANDLERS (READ/WRITE)
+        // _________________________________________________________________
+
+        // 🔥 AUTHENTICATION
+        function handleSignIn() {
+            const email = document.getElementById('adminEmail').value;
+            const pass = document.getElementById('adminPass').value;
+
+            if (!email || !pass) {
+                alert('Please enter both email and password.');
+                return;
+            }
+
+            firebase.auth().signInWithEmailAndPassword(email, pass)
+                .then(() => {
+                    alert('Logged in successfully as Admin!');
+                    showApp('admin');
+                })
+                .catch((error) => {
+                    console.error("Login Error:", error.message);
+                    alert(`Login Failed: ${error.message}`);
+                });
+        }
+
+        // 🔥 ENROLL STUDENT (CLOUDINARY UPLOAD & DB WRITE)
+        function handleEnrollStudent() {
+            if (userRole !== 'admin') {
+                alert('Access denied. Only admin can enroll students.');
+                return;
+            }
+            if (!db) {
+                console.error("Database connection failed.");
+                alert("Database connection failed. Check console.");
+                return;
+            }
+
+            const name = document.getElementById('studentName').value;
+            const id = document.getElementById('studentId').value;
+            const branch = document.getElementById('studentBranch').value;
+            const photoFile = document.getElementById('studentPhoto').files[0];
+
+            if (!name || !id || !branch || !photoFile) {
+                alert('Please fill all required fields and select a photo.');
+                return;
+            }
+
+            const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+            const formData = new FormData();
+            formData.append('file', photoFile);
+            formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+            alert('Uploading photo... please wait.');
+
+            fetch(uploadUrl, { method: 'POST', body: formData })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(errorData => {
+                            const msg = errorData.error ? errorData.error.message : 'Unknown Preset Error';
+                            console.error("Cloudinary Detailed Error:", errorData);
+                            alert(`Upload FAILED (HTTP ${response.status}). Check Cloudinary Preset Settings: ${msg}`);
+                            throw new Error(`Upload failed with HTTP status: ${response.status}.`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.secure_url) {
+                        const downloadURL = data.secure_url;
+                        console.log('Cloudinary Upload Success. URL:', downloadURL);
+
+                        // Save to Realtime Database
+                        return db.ref('students/' + id).set({
+                            name: name,
+                            id: id,
+                            branch: branch,
+                            enrolled_time: new Date().toLocaleString(),
+                            photo_url: downloadURL
+                        });
+                    } else {
+                        throw new Error('Cloudinary upload failed: Missing secure_url in response.');
+                    }
+                })
+                .then(() => {
+                    alert('Student enrolled and photo saved successfully! Total student count will refresh.');
+                    // Clear inputs
+                    document.getElementById('studentName').value = '';
+                    document.getElementById('studentId').value = '';
+                    document.getElementById('studentPhoto').value = '';
+                })
+                .catch(error => {
+                    console.error("Enrollment CRITICAL FAILURE:", error);
+                    alert('Enrollment failure: ' + error.message);
+                });
+        }
+
+        // 🔥 DATA READ: STUDENTS
+        function loadStudents() {
+            if (!db) return;
+
+            const box = document.querySelector('#students .box');
+            box.innerHTML = `<p>Loading enrolled students...</p>`;
+
+            db.ref('students').on('value', snap => {
+                students = [];
+                const data = snap.val();
+                if (data) {
+                    students = Object.values(data);
+                }
+
+                box.innerHTML =
+                    `<h3>Enrolled Students (${students.length})</h3>
+                     <table>
+                       <tr><th>Name</th><th>ID</th><th>Branch</th><th>Photo</th></tr>
+                       ${students.map(s => `
+                            <tr>
+                                <td>${s.name}</td>
+                                <td>${s.id}</td>
+                                <td>${s.branch}</td>
+                                <td><img src="${s.photo_url}" class="student-photo-preview"></td>
+                            </tr>`).join('')}
+                     </table>`;
+
+                updateDashboard(); // Update dashboard with new student count
+            });
+        }
+
+        // 🔥 DATA READ: ATTENDANCE LOGS
+        function loadAttendance() {
+            if (!db) return;
+            const list = document.querySelector('#attendance .box');
+            list.innerHTML = '<p>Loading real-time logs from the RPi system...</p>';
+
+            db.ref('attendance_logs').orderByChild('timestamp').on('value', (snapshot) => {
+                attendance = [];
+                snapshot.forEach((childSnapshot) => {
+                    attendance.unshift(childSnapshot.val());
+                });
+
+                let content = '<h3>Recent Logs (RPi/Face Detection Input)</h3>';
+                const logs = '<table><tr><th>Student ID</th><th>Status</th><th>Time</th></tr>' +
+                    (attendance.length > 0 ? attendance.map(a => `<tr><td>${a.studentId}</td><td>${a.status}</td><td>${a.time}</td></tr>`).join('') : '<tr><td colspan="3">No attendance logs found. Waiting for RPi input...</td></tr>') +
+                    '</table>';
+
+                list.innerHTML = content + logs;
+            });
+        }
+
+        // 🔥 DASHBOARD DATA UPDATE
+        function updateDashboard() {
+            if (!db) return;
+
+            const total = students.length;
+            const totalEl = document.querySelector('#dashboard .box:nth-child(1) p:nth-child(2) strong');
+            const presentEl = document.querySelector('#dashboard .box:nth-child(1) p:nth-child(3) strong');
+            const absentEl = document.querySelector('#dashboard .box:nth-child(1) p:nth-child(4) strong');
+            const lastEl = document.querySelector('#dashboard .box:nth-child(1) p:nth-child(5) strong');
+
+            totalEl.textContent = total;
+
+            const today = new Date().toDateString();
+            const presentSet = new Set();
+
+            db.ref('attendance_logs').once('value')
+                .then((snapshot) => {
+                    snapshot.forEach((c) => {
+                        const log = c.val();
+                        if (!log.time) return;
+
+                        const logDate = new Date(log.time).toDateString();
+
+                        if (log.status === "Present" && today === logDate) {
+                            presentSet.add(log.studentId);
+                        }
+                    });
+
+                    const presentCount = presentSet.size;
+                    presentEl.textContent = presentCount;
+                    absentEl.textContent = total - presentCount;
+                    lastEl.textContent = new Date().toLocaleString();
+
+                    // Populate Student dropdown
+                    const dropdown = document.getElementById("studentSelect");
+                    dropdown.innerHTML =
+                        `<option>Select Student</option>` +
+                        students.map(s => `<option value="${s.id}">${s.name} (${s.id})</option>`).join('');
+                })
+                .catch(err => {
+                    console.error("Dashboard Update Error:", err);
+                    lastEl.textContent = "Error fetching data!";
+                });
+        }
+
+        // 🔥 COMMUNICATION: SEND BROADCAST
+        function handleSendBroadcast() {
+            if (userRole !== 'admin') return alert('Admin access required.');
+            if (!db) return;
+            const msg = document.getElementById('broadcastText').value;
+
+            if (msg) {
+                db.ref('broadcasts/latest').set({
+                    message: msg,
+                    time: new Date().toLocaleString(),
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                })
+                    .then(() => {
+                        alert('Message broadcasted successfully!');
+                        document.getElementById('broadcastText').value = '';
+                        loadLatestBroadcast(); // Refresh display
+                    })
+                    .catch(error => {
+                        console.error("Broadcast failed:", error);
+                        alert('Failed to send broadcast: ' + error.message);
+                    });
+            } else {
+                alert('Please enter a message to broadcast.');
+            }
+        }
+
+        // 🔥 COMMUNICATION: LOAD BROADCAST
+        function loadLatestBroadcast() {
+            if (!db) return;
+
+            db.ref('broadcasts/latest').on('value', (snapshot) => {
+                const data = snapshot.val();
+                const adminDisplay = document.getElementById('latestBroadcast');
+                const studentDisplay = document.getElementById('studentBroadcastContent');
+
+                if (data) {
+                    const content = `${data.message} <br><small>(${data.time})</small>`;
+                    if (adminDisplay) adminDisplay.innerHTML = content;
+                    if (studentDisplay) studentDisplay.innerHTML = `${data.message} <br><small>— Admin (${data.time})</small>`;
+                } else {
+                    if (adminDisplay) adminDisplay.textContent = 'No announcements yet.';
+                    if (studentDisplay) studentDisplay.textContent = 'Welcome! Waiting for admin announcement...';
+                }
+            });
+        }
+
+        // 🔥 COMMUNICATION: SUBMIT FEEDBACK
+        function handleSubmitFeedback() {
+            if (!db) return;
+            const text = document.getElementById('submitFeedbackText').value;
+
+            if (text) {
+                db.ref('feedbacks').push().set({
+                    text: text,
+                    time: new Date().toLocaleString(),
+                    role: userRole
+                })
+                    .then(() => {
+                        document.getElementById('submitFeedbackText').value = '';
+                        alert('Feedback submitted!');
+                        loadFeedbacks();
+                    })
+                    .catch((error) => {
+                        alert('Feedback submission failed: ' + error.message);
+                    });
+            } else {
+                alert('Please enter your feedback.');
+            }
+        }
+
+        // 🔥 COMMUNICATION: LOAD FEEDBACKS (Admin View)
+        function loadFeedbacks() {
+            if (!db) return;
+            const list = document.getElementById('feedbackList');
+            if (!list) return;
+
+            list.innerHTML = '<li>Loading feedbacks...</li>';
+
+            db.ref('feedbacks').once('value')
+                .then((snapshot) => {
+                    feedbacks = [];
+                    snapshot.forEach((childSnapshot) => {
+                        feedbacks.push(childSnapshot.val());
+                    });
+
+                    // Display feedback list (Admin view) - newest first
+                    const feedbackHtml = feedbacks.reverse().map(f => `<li><strong>(${f.role})</strong>: ${f.text} <br><small>${f.time}</small></li>`).join('') || '<li>No feedback yet</li>';
+                    list.innerHTML = feedbackHtml;
+                })
+                .catch((error) => {
+                    console.error("Error reading feedbacks from Firebase:", error);
+                    list.innerHTML = '<li>Error loading feedbacks.</li>';
+                });
+        }
+
+
+        // 🔥 ANALYTICS: CALCULATE ATTENDANCE %
+        function handleCalculate() {
+            if (!db) return;
+            const student = document.getElementById('studentSelect').value;
+            const month = document.getElementById('monthSelect').value;
+            const output = document.getElementById('analyticsOutput');
+
+            if (!student || student === 'Select Student') {
+                output.textContent = `Please select a student.`;
+                return;
+            }
+
+            output.textContent = `Calculating attendance for ${student} in ${month}...`;
+
+            db.ref('attendance_logs').once('value')
+                .then((snapshot) => {
+                    let presentCount = 0;
+                    let totalSessions = 0;
+
+                    snapshot.forEach((childSnapshot) => {
+                        const log = childSnapshot.val();
+                        if (log.studentId === student && log.time && log.time.includes(month)) {
+                            totalSessions++;
+                            if (log.status === 'Present') {
+                                presentCount++;
+                            }
+                        }
+                    });
+
+                    const percentage = totalSessions ? (presentCount / totalSessions * 100).toFixed(2) : 0;
+                    output.innerHTML =
+                        `<strong>Attendance for ${student} in ${month}:</strong> <span style="font-size: 1.2em; color: ${percentage >= 75 ? 'green' : 'red'};">${percentage}%</span> (${presentCount} / ${totalSessions} sessions)`;
+                })
+                .catch((error) => {
+                    console.error("Error calculating analytics:", error);
+                    output.textContent = 'Error calculating analytics from Firebase.';
+                });
+        }
+
+
+        // 🔥 ANALYTICS: GENERATE MONTHLY REPORT
+        function loadReports() {
+            // Function to ensure the report page structure is dynamic
+            const box = document.querySelector('#reports .grid .box:first-child');
+
+            box.innerHTML = `
+                <h3>Monthly Attendance Reports</h3>
+                <label>Select Month:</label>
+                <input type="month" id="reportMonth">
+                <button onclick="generateMonthlyReport()" style="margin-top:10px;">Generate</button>
+                <div id="reportOutput" style="margin-top:20px;"></div>
+            `;
+        }
+
+        function generateMonthlyReport() {
+            const month = document.getElementById("reportMonth").value;
+            const out = document.getElementById("reportOutput");
+
+            if (!month) {
+                out.innerHTML = `<p>Please select a month.</p>`;
+                return;
+            }
+
+            out.innerHTML = `<p>Generating report for ${month}...</p>`;
+
+            db.ref("attendance_logs").once("value").then(snap => {
+                const logs = [];
+                snap.forEach(c => logs.push(c.val()));
+
+                // Filter logs by the selected month (e.g., "2025-12")
+                const monthYear = month.substring(0, 7); // Extract YYYY-MM
+                const filtered = logs.filter(l => l.time && l.time.includes(monthYear));
+
+                const grouped = {};
+                filtered.forEach(l => {
+                    if (!grouped[l.studentId]) grouped[l.studentId] = { present: 0, total: 0 };
+                    // Only count successful 'Present' entries
+                    if (l.status === "Present") {
+                        grouped[l.studentId].present++;
+                    }
+                    // For total, we should probably count unique *sessions* not every log entry.
+                    // For simplicity here, we'll count total present/absent logs, which serves as 'total sessions attended'
+                    grouped[l.studentId].total++;
+                });
+
+                let html = `<table>
+                    <tr><th>Student ID</th><th>Present Count</th><th>Total Logs</th><th>Attendance Percentage</th></tr>`;
+
+                Object.keys(grouped).forEach(id => {
+                    const g = grouped[id];
+                    const pct = (g.present / g.total * 100).toFixed(2);
+                    html += `<tr><td>${id}</td><td>${g.present}</td><td>${g.total}</td><td>${pct}%</td></tr>`;
+                });
+
+                html += `</table>`;
+
+                out.innerHTML = html;
+            });
+        }
+
+        // 🔥 DATA UTILITY: EXPORT CSV
+        function handleExport() {
+            if (userRole !== 'admin') {
+                alert('Admin login required for full data export.');
+                return;
+            }
+            if (!db) return;
+
+            db.ref('attendance_logs').once('value')
+                .then((snapshot) => {
+                    let csv = 'Student ID,Status,Time\n';
+                    snapshot.forEach((childSnapshot) => {
+                        const a = childSnapshot.val();
+                        // Use .replace(/"/g, '""') to escape quotes within the time string if needed, and wrap in quotes
+                        csv += `${a.studentId},${a.status},"${a.time.replace(/"/g, '""')}"\n`;
+                    });
+
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'attendance_firebase_export.csv';
+                    a.click();
+                    URL.revokeObjectURL(url); // Clean up
+                })
+                .catch((error) => {
+                    alert('Export failed: ' + error.message);
+                });
+        }
+
+
+        // _________________________________________________________________
+        // 🚀 SECTION 4: EVENT LISTENERS & INITIALIZATION
+        // _________________________________________________________________
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Auth Handlers
+            document.getElementById('signInBtn').addEventListener('click', handleSignIn);
+            document.getElementById('signUpBtn').addEventListener('click', () => alert('Sign up not implemented yet.'));
+            document.getElementById('studentAccessBtn').addEventListener('click', () => {
+                alert('Continuing as Student (View Only).');
+                showApp('student');
+            });
+
+            // Admin & Utility Handlers
+            document.getElementById('enrollBtn').addEventListener('click', handleEnrollStudent);
+            document.getElementById('sendBroadcastBtn').addEventListener('click', handleSendBroadcast);
+            document.getElementById('refreshBtn').addEventListener('click', () => location.reload());
+            document.getElementById('exportBtn').addEventListener('click', handleExport);
+            document.getElementById('calculateBtn').addEventListener('click', handleCalculate);
+
+            // General Handlers
+            document.getElementById('submitFeedbackBtn').addEventListener('click', handleSubmitFeedback);
+
+
+            // Initial data load setup (runs after listeners are attached)
+            // This is primarily to populate `students` and `studentSelect` dropdowns
+            loadStudents();
+        });
+    </script>
+
+</body>
+</html>
