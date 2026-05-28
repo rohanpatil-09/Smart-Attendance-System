@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,7 +12,7 @@
 
     <style>
         /* BASE & LAYOUT */
-        body { margin: 0; font-family: Arial, sans-serif; background: hsl(223, 47%, 97%); }
+        body { margin: 0; font-family: Arial, sans-serif; background: #f4f6fb; }
         .container { display: flex; padding: 20px; gap: 20px; }
         .sidebar {
             width: 260px; background: white; border-radius: 12px; padding: 20px;
@@ -74,41 +75,6 @@
         
         /* TIMETABLE SPECIFIC */
         #timetableOutput { overflow-x: auto; }
-        
-        /* PASSWORD TOGGLE */
-        .password-container {
-            position: relative;
-            width: 100%;
-        }
-        .toggle-password {
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            cursor: pointer;
-            background: none;
-            border: none;
-            font-size: 18px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            color: #000; /* Make the icon black */
-        }
-        .toggle-password:hover {
-            background-color: #eee;
-        }
-        
-        /* ANNOUNCEMENTS */
-        .announcement-item {
-            border-bottom: 1px solid #eee;
-            padding: 10px 0;
-        }
-        .announcement-item:last-child {
-            border-bottom: none;
-        }
     </style>
 </head>
 <body>
@@ -121,10 +87,7 @@
             <label for="adminEmail">Email:</label>
             <input type="email" id="adminEmail" placeholder="admin@example.com">
             <label for="adminPass">Password:</label>
-            <div class="password-container">
-                <input type="password" id="adminPass" placeholder="password">
-                <button class="toggle-password" id="togglePassword">👁</button>
-            </div>
+            <input type="password" id="adminPass" placeholder="password">
             <button id="signInBtn" style="width: 100%; margin-bottom: 10px;">Sign In (Admin)</button>
             <button id="signUpBtn" style="width: 100%; background:#999;">Sign Up (Not Implemented)</button>
 
@@ -179,7 +142,7 @@
             <div class="page" id="timetable-management" style="display:none;">
                 <h2>Timetable Management & Course Setup</h2>
                 <div class="grid">
-                    <div class="box" id="admin-course-setup">
+                    <div class="box">
                         <h3>Add New Course/Subject</h3>
                         <label for="courseId">Course ID (e.g., CS301):</label>
                         <input id="courseId" placeholder="Unique Course ID">
@@ -197,7 +160,7 @@
                         </select>
                         <button id="addCourseBtn" style="width: 100%;">Add Course</button>
                     </div>
-                    <div class="box" id="admin-session-setup">
+                    <div class="box">
                         <h3>Schedule New Session</h3>
                         <label for="scheduleCourseSelect">Select Course:</label>
                         <select id="scheduleCourseSelect">
@@ -269,8 +232,8 @@
             <div class="page" id="student-dashboard" style="display:none;">
                 <h2>Student Dashboard</h2>
                 <div id="broadcast-msg">
-                    <h4>📢 All Announcements</h4>
-                    <div id="studentBroadcastContent">Loading announcements...</div>
+                    <h4>📢 Latest Announcement</h4>
+                    <p id="studentBroadcastContent">Loading latest announcement...</p>
                 </div>
                 <div class="box" style="margin-top:20px;">
                     <h3>My Attendance Summary</h3>
@@ -296,24 +259,10 @@
                 <h2>Reports</h2>
                 <div class="grid">
                     <div class="box">
-                        <h3>Monthly Attendance Reports</h3>
-                        <label for="reportMonth">Select Month:</label>
-                        <input type="month" id="reportMonth" value="2025-11">
-                        <br><br>
-                        <button id="generateMonthlyReportBtn" style="width: 100%; margin-bottom: 8px;">Generate Monthly Report</button>
-                        <button id="downloadReportCsvBtn" style="width: 100%; background: #27ae60; color: white; margin-bottom: 8px;">Download Report as CSV</button>
-                        
-                        <h3>Monthly Attendance Summary (<span id="reportMonthDisplay">2025-11</span>)</h3>
-                        <div id="reportOutput">
-                            <p>Generate a report to view summary.</p>
-                        </div>
+                        <h3>Monthly Reports</h3>
+                        <p>Reports will be generated here using data from the database.</p>
                     </div>
-                    <div class="box">
-                        <h3>Export Options</h3>
-                        <p>Generate and download attendance data in CSV format:</p>
-                        <button id="exportAllLogsBtn" style="width: 100%; margin-bottom: 8px; background: #2563eb; color: white;">Export All Attendance Logs</button>
-                        <button id="exportCurrentReportBtn" style="width: 100%; background: #27ae60; color: white;">Export Current Report</button>
-                    </div>
+                    <div class="box">Export & Scheduling</div>
                 </div>
             </div>
 
@@ -395,8 +344,6 @@
     const mainAppContent = document.querySelector('.main-app-content');
     const adminSidebarControls = document.getElementById('admin-sidebar-controls');
     const adminBroadcastBlock = document.getElementById('adminBroadcastBlock');
-    const adminCourseSetup = document.getElementById('admin-course-setup');
-    const adminSessionSetup = document.getElementById('admin-session-setup');
 
     // Helper: Converts Firebase object map to array
     const objToArray = (obj) => obj ? Object.keys(obj).map(key => ({ ...obj[key], firebaseKey: key })) : [];
@@ -421,63 +368,18 @@
             adminSidebarControls.style.display = 'block';
             adminBroadcastBlock.style.display = 'block';
             
-            // Show admin-only sections
-            if (adminCourseSetup) adminCourseSetup.style.display = 'block';
-            if (adminSessionSetup) adminSessionSetup.style.display = 'block';
-            
             loadStudents();
             loadCourses(); 
             loadWeeklySchedule(); 
-            loadLiveSessionLogs();
             
             openPage('dashboard', document.querySelector('.nav-btn[onclick*="dashboard"]'));
         } else if (role === 'student') {
             adminSidebarControls.style.display = 'none';
             adminBroadcastBlock.style.display = 'none';
-            
-            // Hide admin-only sections for students
-            if (adminCourseSetup) adminCourseSetup.style.display = 'none';
-            if (adminSessionSetup) adminSessionSetup.style.display = 'none';
-            
-            // FIX 1: Load all required data for student dashboard
-            loadStudents();
-            loadCourses(); 
-            loadWeeklySchedule(); 
-            loadLiveSessionLogs();
-            loadAllBroadcasts(); // Load all announcements for students
-            
-            // Open student dashboard
+            loadLatestBroadcast();
             openPage('student-dashboard', document.querySelector('.nav-btn[onclick*="student-dashboard"]'));
         }
     }
-
-    // function openPage(pageId, element) {
-    //     document.querySelectorAll(".page").forEach(p => p.style.display = "none");
-    //     document.getElementById(pageId).style.display = "block";
-
-    //     let navButton = element || document.querySelector(`.nav-btn[onclick*="${pageId}"]`);
-    //     document.querySelectorAll(".nav-btn").forEach(btn => btn.classList.remove("active"));
-    //     if (navButton) navButton.classList.add("active");
-
-    //     if (pageId === 'students') loadStudents();
-    //     if (pageId === 'attendance') loadLiveSessionLogs();
-    //     if (pageId === 'dashboard') updateDashboardSummary();
-    //     if (pageId === 'student-dashboard') loadAllBroadcasts();
-    //     if (pageId === 'reports') { loadReports(); }
-    //     if (pageId === 'feedback') { loadFeedbacks(); loadAllBroadcasts(); }
-    //     if (pageId === 'timetable-management') { 
-    //         loadCourses(); 
-    //         loadWeeklySchedule(); 
-    //     } 
-    // }
-
-    // function loadReports() {
-    //     const monthEl = document.getElementById('reportMonth');
-    //     const monthDisplayEl = document.getElementById('reportMonthDisplay');
-    //     if(monthEl && monthDisplayEl) {
-    //         monthDisplayEl.textContent = monthEl.value;
-    //     }
-    // }
 
     function openPage(pageId, element) {
         document.querySelectorAll(".page").forEach(p => p.style.display = "none");
@@ -489,52 +391,19 @@
 
         if (pageId === 'students') loadStudents();
         if (pageId === 'attendance') loadLiveSessionLogs();
-
-        // This ensures months are calculated when you click Dashboard or Reports
-        if (pageId === 'dashboard') {
-            updateDashboardSummary();
-            populateDynamicMonths(); 
-        }
-        if (pageId === 'reports') { 
-            loadReports(); 
-            populateDynamicMonths(); 
-        }
-
-        if (pageId === 'student-dashboard') loadAllBroadcasts();
-        if (pageId === 'feedback') { loadFeedbacks(); loadAllBroadcasts(); }
+        if (pageId === 'dashboard') updateDashboardSummary();
+        if (pageId === 'student-dashboard') loadLatestBroadcast();
+        if (pageId === 'reports') { loadReports(); }
+        if (pageId === 'feedback') { loadFeedbacks(); loadLatestBroadcast(); }
         if (pageId === 'timetable-management') { 
             loadCourses(); 
             loadWeeklySchedule(); 
         } 
     }
 
-    // 🔥 NEW: DYNAMIC MONTH POPULATION
-    function populateDynamicMonths() {
-        const monthSelect = document.getElementById('monthSelect');
-        const reportMonthInput = document.getElementById('reportMonth');
-        
-        // Populate Analytics Month Dropdown
-        if (monthSelect) {
-            const now = new Date();
-            let optionsHtml = '';
-            // Generate list for the last 6 months + current month
-            for (let i = 0; i < 7; i++) {
-                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                const monthName = d.toLocaleString('default', { month: 'long' });
-                const year = d.getFullYear();
-                const value = `${monthName} ${year}`;
-                optionsHtml += `<option value="${value}">${value}</option>`;
-            }
-            monthSelect.innerHTML = optionsHtml;
-        }
-
-        // Set Reports default YYYY-MM to current real-time month
-        if (reportMonthInput && !reportMonthInput.value) {
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            reportMonthInput.value = `${year}-${month}`;
-        }
+    // Simple stub so "Reports" click does not throw an error
+    function loadReports() {
+        // You can later extend this to pre-load report data if needed.
     }
 
     // _________________________________________________________________
@@ -710,129 +579,63 @@
     }
 
     // 🔥 ENROLL STUDENT
-    // function handleEnrollStudent() {
-    //     if (userRole !== 'admin' || !db) {
-    //         alert('Admin access or database required.');
-    //         return;
-    //     }
+    function handleEnrollStudent() {
+        if (userRole !== 'admin' || !db) {
+            alert('Admin access or database required.');
+            return;
+        }
 
-    //     const name = document.getElementById('studentName').value;
-    //     const id = document.getElementById('studentId').value;
-    //     const branch = document.getElementById('studentBranch').value;
-    //     const photoFile = document.getElementById('studentPhoto').files[0];
+        const name = document.getElementById('studentName').value;
+        const id = document.getElementById('studentId').value;
+        const branch = document.getElementById('studentBranch').value;
+        const photoFile = document.getElementById('studentPhoto').files[0];
 
-    //     if (!name || !id || !branch || !photoFile) {
-    //         alert('Please fill all required fields and select a photo.');
-    //         return;
-    //     }
+        if (!name || !id || !branch || !photoFile) {
+            alert('Please fill all required fields and select a photo.');
+            return;
+        }
 
-    //     const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-    //     const formData = new FormData();
-    //     formData.append('file', photoFile);
-    //     formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+        const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+        const formData = new FormData();
+        formData.append('file', photoFile);
+        formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
 
-    //     alert('Uploading photo... please wait.');
+        alert('Uploading photo... please wait.');
 
-    //     fetch(uploadUrl, { method: 'POST', body: formData })
-    //         .then(response => {
-    //             if (!response.ok) return response.json().then(errorData => {
-    //                 throw new Error(`Upload failed: ${errorData.error.message || 'Unknown error'}`);
-    //             });
-    //             return response.json();
-    //         })
-    //         .then(data => {
-    //             if (data.secure_url) {
-    //                 const downloadURL = data.secure_url;
-    //                 return db.ref('students/' + id).set({
-    //                     name: name,
-    //                     id: id,
-    //                     branch: branch,
-    //                     enrolled_time: new Date().toLocaleString(),
-    //                     photo_url: downloadURL
-    //                 });
-    //             } else {
-    //                 throw new Error('Cloudinary upload failed: Missing secure_url in response.');
-    //             }
-    //         })
-    //         .then(() => {
-    //             alert('Student enrolled successfully!');
-    //             document.getElementById('studentName').value = '';
-    //             document.getElementById('studentId').value = '';
-    //             document.getElementById('studentPhoto').value = '';
-    //             loadStudents(); 
-    //             loadCourses(); 
-    //         })
-    //         .catch(error => {
-    //             console.error("Enrollment CRITICAL FAILURE:", error);
-    //             alert('Enrollment failure: ' + error.message);
-    //         });
-    // }
-
-    // 🔥 UPDATED ENROLL STUDENT (With Per-Person Cloudinary Folders)
-function handleEnrollStudent() {
-    if (userRole !== 'admin' || !db) {
-        alert('Admin access or database required.');
-        return;
-    }
-
-    const name = document.getElementById('studentName').value;
-    const id = document.getElementById('studentId').value; // e.g., ECS70
-    const branch = document.getElementById('studentBranch').value;
-    const photoFile = document.getElementById('studentPhoto').files[0];
-
-    if (!name || !id || !branch || !photoFile) {
-        alert('Please fill all required fields and select a photo.');
-        return;
-    }
-
-    const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-    const formData = new FormData();
-    formData.append('file', photoFile);
-    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-    
-    // --- 🚀 THE FIX FOR PER-PERSON FOLDERS ---
-    // This tells Cloudinary: Create/Use folder 'attendance_photos/ECS70'
-    formData.append('folder', `attendance_photos/${id}`); 
-    // This names the file 'photo_1' inside that folder
-    formData.append('public_id', `photo_1`); 
-    // -----------------------------------------
-
-    alert('Uploading photo and creating student folder... please wait.');
-
-    fetch(uploadUrl, { method: 'POST', body: formData })
-        .then(response => {
-            if (!response.ok) return response.json().then(errorData => {
-                throw new Error(`Upload failed: ${errorData.error.message || 'Unknown error'}`);
-            });
-            return response.json();
-        })
-        .then(data => {
-            if (data.secure_url) {
-                const downloadURL = data.secure_url;
-                // Save details to Firebase
-                return db.ref('students/' + id).set({
-                    name: name,
-                    id: id,
-                    branch: branch,
-                    enrolled_time: new Date().toLocaleString(),
-                    photo_url: downloadURL
+        fetch(uploadUrl, { method: 'POST', body: formData })
+            .then(response => {
+                if (!response.ok) return response.json().then(errorData => {
+                    throw new Error(`Upload failed: ${errorData.error.message || 'Unknown error'}`);
                 });
-            } else {
-                throw new Error('Cloudinary upload failed: Missing secure_url in response.');
-            }
-        })
-        .then(() => {
-            alert(`Success! Folder 'attendance_photos/${id}' created and student enrolled.`);
-            document.getElementById('studentName').value = '';
-            document.getElementById('studentId').value = '';
-            document.getElementById('studentPhoto').value = '';
-            loadStudents(); 
-        })
-        .catch(error => {
-            console.error("Enrollment CRITICAL FAILURE:", error);
-            alert('Enrollment failure: ' + error.message);
-        });
-}
+                return response.json();
+            })
+            .then(data => {
+                if (data.secure_url) {
+                    const downloadURL = data.secure_url;
+                    return db.ref('students/' + id).set({
+                        name: name,
+                        id: id,
+                        branch: branch,
+                        enrolled_time: new Date().toLocaleString(),
+                        photo_url: downloadURL
+                    });
+                } else {
+                    throw new Error('Cloudinary upload failed: Missing secure_url in response.');
+                }
+            })
+            .then(() => {
+                alert('Student enrolled successfully!');
+                document.getElementById('studentName').value = '';
+                document.getElementById('studentId').value = '';
+                document.getElementById('studentPhoto').value = '';
+                loadStudents(); 
+                loadCourses(); 
+            })
+            .catch(error => {
+                console.error("Enrollment CRITICAL FAILURE:", error);
+                alert('Enrollment failure: ' + error.message);
+            });
+    }
 
     // 🔥 DATA READ: STUDENTS 
     function loadStudents() {
@@ -887,119 +690,112 @@ function handleEnrollStudent() {
     }
 
     // 🔥 DASHBOARD DATA SUMMARY UPDATE
-   function updateDashboardSummary() {
-    const total = students.length;
-    const totalEl = document.querySelector('#dashboard .box:nth-child(1) p:nth-child(2) strong');
-    const presentEl = document.querySelector('#dashboard .box:nth-child(1) p:nth-child(3) strong');
-    const absentEl = document.querySelector('#dashboard .box:nth-child(1) p:nth-child(4) strong');
-    const lastEl = document.querySelector('#dashboard .box:nth-child(1) p:nth-child(5) strong');
+    function updateDashboardSummary() {
+        const total = students.length;
+        const totalEl = document.querySelector('#dashboard .box:nth-child(1) p:nth-child(2) strong');
+        const presentEl = document.querySelector('#dashboard .box:nth-child(1) p:nth-child(3) strong');
+        const absentEl = document.querySelector('#dashboard .box:nth-child(1) p:nth-child(4) strong');
+        const lastEl = document.querySelector('#dashboard .box:nth-child(1) p:nth-child(5) strong');
 
-    if (totalEl) totalEl.textContent = total;
+        if (totalEl) totalEl.textContent = total;
 
-    const selectedCourse = document.getElementById('dashboardSubjectSelect')?.value;
-    const today = new Date().toISOString().split("T")[0];
+        const today = new Date().toDateString();
+        const presentSet = new Set();
+        let latestTime = 'N/A';
 
-    const presentSet = new Set();
-    let latestTime = 'N/A';
+        sessionLogs.forEach(log => {
+            if (!log.time) return;
 
-    sessionLogs.forEach(log => {
-        if (
-            log.date === today &&
-            log.status === "Present" &&
-            log.courseId === selectedCourse
-        ) {
-            presentSet.add(log.studentId);
-            latestTime = log.time;
-        }
-    });
-
-    const presentCount = selectedCourse && selectedCourse !== "Select Subject"
-        ? presentSet.size
-        : 0;
-
-    if (presentEl) presentEl.textContent = presentCount;
-    if (absentEl) absentEl.textContent = total - presentCount;
-    if (lastEl) lastEl.textContent = latestTime;
-
-    const dropdown = document.getElementById("studentSelect");
-    if (dropdown) {
-        dropdown.innerHTML =
-            `<option value="Select Student">Select Student</option>` +
-            students.map(s => `<option value="${s.id}">${s.name} (${s.id})</option>`).join('');
-    }
-}
-
-function calculateScheduledSessions(courseId, studentBranch, year, monthIndex) {
-    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-    const sessionsForCourse = objToArray(weeklySchedule).filter(s => s.course_id === courseId);
-    let count = 0;
-
-    for (let i = 1; i <= daysInMonth; i++) {
-        const date = new Date(year, monthIndex, i);
-        const dayOfWeek = date.getDay();
-        const scheduleDayIndex = dayOfWeek === 0 ? 7 : dayOfWeek;
-
-        sessionsForCourse.forEach(session => {
-            if (
-                session.day_index === scheduleDayIndex &&
-                (courses[courseId].branch === 'All' || courses[courseId].branch === studentBranch)
-            ) {
-                count++;
+            const logDate = new Date(log.time).toDateString();
+            if (log.status === "Present" && today === logDate) {
+                presentSet.add(log.studentId);
+                latestTime = log.time;
             }
         });
-    }
 
-    return count;
-}
+        const presentCount = presentSet.size;
+        if (presentEl) presentEl.textContent = presentCount;
+        if (absentEl) absentEl.textContent = total - presentCount;
+        if (lastEl) lastEl.textContent = latestTime;
+
+        const dropdown = document.getElementById("studentSelect");
+        if (dropdown) {
+            dropdown.innerHTML =
+                `<option value="Select Student">Select Student</option>` +
+                students.map(s => `<option value="${s.id}">${s.name} (${s.id})</option>`).join('');
+        }
+    }
 
     // 🔥 ANALYTICS: CALCULATE ATTENDANCE %
     async function handleCalculate() {
-    const studentId = document.getElementById('studentSelect').value;
-    const courseId = document.getElementById('dashboardSubjectSelect').value;
-    const monthDropdownValue = document.getElementById('monthSelect').value;
-    const output = document.getElementById('analyticsOutput');
-
-    if (!studentId || studentId === 'Select Student' || !courseId || courseId === 'Select Subject') {
-        output.textContent = "Please select a student and a subject.";
-        return;
-    }
-
-    const studentDetails = students.find(s => s.id === studentId);
-    const courseDetails = courses[courseId];
-
-    if (!studentDetails || !courseDetails) {
-        output.textContent = "Student or course not found.";
-        return;
-    }
-
-    const [monthName, year] = monthDropdownValue.split(' ');
-    const monthIndex = new Date(Date.parse(monthName + " 1, " + year)).getMonth();
-    const selectedMonth = `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
-
-    const logs = await db.ref('attendance_logs').once('value').then(snap => objToArray(snap.val()));
-
-    const attendedSet = new Set();
-
-    logs.forEach(log => {
-        if (
-            log.studentId === studentId &&
-            log.courseId === courseId &&
-            log.month === selectedMonth &&
-            log.status === "Present"
-        ) {
-            attendedSet.add(log.date);
+        if (!db || Object.keys(weeklySchedule).length === 0) {
+             document.getElementById('analyticsOutput').textContent = "Timetable data not loaded. Please log in as Admin and ensure courses/sessions are scheduled.";
+             return;
         }
-    });
 
-    const attended = attendedSet.size;
-    const scheduled = calculateScheduledSessions(courseId, studentDetails.branch, parseInt(year), monthIndex);
-    const percentage = scheduled > 0 ? ((attended / scheduled) * 100).toFixed(2) : "0.00";
+        const studentId = document.getElementById('studentSelect').value;
+        const courseId = document.getElementById('dashboardSubjectSelect').value;
+        const monthDropdownValue = document.getElementById('monthSelect').value;
+        const output = document.getElementById('analyticsOutput');
 
-    output.innerHTML =
-        `<strong>Attendance for ${studentDetails.name} in ${courseDetails.name}:</strong>
-         <span style="font-size: 1.2em; color: ${percentage >= 75 ? 'green' : 'red'};">${percentage}%</span>
-         (${attended} sessions attended / ${scheduled} sessions scheduled)`;
-}
+        if (!studentId || studentId === 'Select Student' || !courseId || courseId === 'Select Subject') {
+            output.textContent = `Please select a student and a subject.`;
+            return;
+        }
+
+        const studentDetails = students.find(s => s.id === studentId);
+        if (!studentDetails || !courses[courseId]) {
+            output.textContent = "Error: Student or Course data is missing.";
+            return;
+        }
+
+        output.textContent = `Calculating attendance for ${studentDetails.name} in ${courses[courseId].name} (${monthDropdownValue})...`;
+
+        const [monthName, year] = monthDropdownValue.split(' ');
+        const monthIndex = new Date(Date.parse(monthName + " 1, " + year)).getMonth();
+        const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+
+        let totalScheduledSessions = 0;
+        const sessionsForCourse = objToArray(weeklySchedule).filter(s => s.course_id === courseId);
+
+        for (let i = 1; i <= daysInMonth; i++) {
+            const date = new Date(year, monthIndex, i);
+            const dayOfWeek = date.getDay();
+            const scheduleDayIndex = dayOfWeek === 0 ? 7 : dayOfWeek;
+            
+            sessionsForCourse.forEach(session => {
+                if (session.day_index === scheduleDayIndex) {
+                    if (courses[courseId].branch === 'All' || courses[courseId].branch === studentDetails.branch) {
+                        totalScheduledSessions++;
+                    }
+                }
+            });
+        }
+        
+        const studentLogs = await db.ref('attendance_logs').once('value').then(snap => objToArray(snap.val()));
+        const sessionsAttended = new Set();
+        
+        studentLogs.forEach(log => {
+            const logDate = log.time ? log.time.split(',')[0] : '';
+            if (log.studentId === studentId && 
+                log.courseId === courseId && 
+                log.time && log.time.includes(monthName) && 
+                log.status === 'Present') 
+            {
+                 sessionsAttended.add(`${logDate}-${log.courseId}`);
+            }
+        });
+
+        const presentCount = sessionsAttended.size;
+        
+        const total = totalScheduledSessions || 1;
+        const percentage = (presentCount / total * 100).toFixed(2);
+        
+        output.innerHTML =
+            `<strong>Attendance for ${studentDetails.name} in ${courses[courseId].name}:</strong> 
+             <span style="font-size: 1.2em; color: ${percentage >= 75 ? 'green' : 'red'};">${percentage}%</span> 
+             (${presentCount} sessions attended / ${totalScheduledSessions} sessions scheduled)`;
+    }
 
     // 🔥 REPORTS: GENERATE MONTHLY REPORT
     async function generateMonthlyReport() {
@@ -1105,112 +901,32 @@ function calculateScheduledSessions(courseId, studentBranch, year, monthIndex) {
         out.innerHTML = html;
     }
 
-    // FIX 2: Export Current Report as CSV
-    function handleExportCurrentReport() {
-        const reportOutput = document.getElementById('reportOutput');
-        if(!reportOutput || !reportOutput.querySelector('table')) {
-            alert('No generated report to export. Please generate a report first.');
-            return;
-        }
-
-        const table = reportOutput.querySelector('table');
-        let csv = [];
-        let rows = table.querySelectorAll('tr');
-        
-        for(let i = 0; i < rows.length; i++) {
-            let row = [], cols = rows[i].querySelectorAll('td, th');
-            
-            for(let j = 0; j < cols.length; j++) {
-                row.push(`"${cols[j].innerText.replace(/"/g, '""')}"`);
-            }
-            csv.push(row.join(','));
-        }
-
-        const blob = new Blob([csv.join('\n')], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        const month = document.getElementById('reportMonth').value || 'attendance_report';
-        a.href = url;
-        a.download = `attendance_report_${month}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-    }
-
     // 🔥 COMMUNICATION: SEND BROADCAST
     function handleSendBroadcast() {
         if (userRole !== 'admin') return alert('Admin access required.');
         if (!db) return;
         const msg = document.getElementById('broadcastText').value;
         if (msg) {
-            // Save to broadcasts with a unique key
-            const newBroadcastRef = db.ref('broadcasts').push();
-            newBroadcastRef.set({
+            db.ref('broadcasts/latest').set({
                 message: msg,
                 time: new Date().toLocaleString(),
                 timestamp: firebase.database.ServerValue.TIMESTAMP
             })
-            .then(() => {
-                // Also save to latest for backward compatibility
-                return db.ref('broadcasts/latest').set({
-                    message: msg,
-                    time: new Date().toLocaleString(),
-                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                .then(() => {
+                    alert('Message broadcasted successfully!');
+                    document.getElementById('broadcastText').value = '';
+                    loadLatestBroadcast();
+                })
+                .catch(error => {
+                    console.error("Broadcast failed:", error);
+                    alert('Failed to send broadcast: ' + error.message);
                 });
-            })
-            .then(() => {
-                alert('Message broadcasted successfully!');
-                document.getElementById('broadcastText').value = '';
-                loadLatestBroadcast();
-                loadAllBroadcasts();
-            })
-            .catch(error => {
-                console.error("Broadcast failed:", error);
-                alert('Failed to send broadcast: ' + error.message);
-            });
         } else {
             alert('Please enter a message to broadcast.');
         }
     }
 
-    // 🔥 COMMUNICATION: LOAD ALL BROADCASTS (NEW FUNCTION)
-    function loadAllBroadcasts() {
-        if (!db) return;
-
-        db.ref('broadcasts').orderByChild('timestamp').limitToLast(50).on('value', (snapshot) => {
-            const data = snapshot.val();
-            const studentDisplay = document.getElementById('studentBroadcastContent');
-            
-            if (data) {
-                // Convert broadcasts to array and sort by timestamp (newest first)
-                const broadcasts = [];
-                Object.keys(data).forEach(key => {
-                    if (key !== 'latest') { // Skip the 'latest' entry
-                        broadcasts.push(data[key]);
-                    }
-                });
-                
-                // Sort by timestamp descending (newest first)
-                broadcasts.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-                
-                if (broadcasts.length > 0) {
-                    const content = broadcasts.map(broadcast => 
-                        `<div class="announcement-item">
-                            <p>${broadcast.message}</p>
-                            <small>(${broadcast.time})</small>
-                        </div>`
-                    ).join('');
-                    
-                    if (studentDisplay) studentDisplay.innerHTML = content;
-                } else {
-                    if (studentDisplay) studentDisplay.textContent = 'No announcements yet.';
-                }
-            } else {
-                if (studentDisplay) studentDisplay.textContent = 'No announcements yet.';
-            }
-        });
-    }
-
-    // 🔥 COMMUNICATION: LOAD LATEST BROADCAST (FOR ADMIN)
+    // 🔥 COMMUNICATION: LOAD BROADCAST
     function loadLatestBroadcast() {
         if (!db) return;
 
@@ -1222,10 +938,7 @@ function calculateScheduledSessions(courseId, studentBranch, year, monthIndex) {
             if (data) {
                 const content = `${data.message} <br><small>(${data.time})</small>`;
                 if (adminDisplay) adminDisplay.innerHTML = content;
-                // For backward compatibility, keep showing latest in student view if all broadcasts not loaded
-                if (studentDisplay && !studentDisplay.querySelector('.announcement-item')) {
-                    studentDisplay.innerHTML = `${data.message} <br><small>— Admin (${data.time})</small>`;
-                }
+                if (studentDisplay) studentDisplay.innerHTML = `${data.message} <br><small>— Admin (${data.time})</small>`;
             } else {
                 if (adminDisplay) adminDisplay.textContent = 'No announcements yet.';
                 if (studentDisplay) studentDisplay.textContent = 'Welcome! Waiting for admin announcement...';
@@ -1302,20 +1015,6 @@ function calculateScheduledSessions(courseId, studentBranch, year, monthIndex) {
             });
     }
 
-    // 🔥 PASSWORD TOGGLE FUNCTIONALITY
-    function togglePasswordVisibility() {
-        const passwordInput = document.getElementById('adminPass');
-        const toggleButton = document.getElementById('togglePassword');
-        
-        if (passwordInput.type === 'password') {
-            passwordInput.type = 'text';
-            toggleButton.innerHTML = '&#128064;'; // Eye with a slash
-        } else {
-            passwordInput.type = 'password';
-            toggleButton.innerHTML = '&#128065;'; // Regular eye
-        }
-    }
-
 
     // _________________________________________________________________
     // 🚀 SECTION 5: EVENT LISTENERS & INITIALIZATION
@@ -1330,16 +1029,12 @@ function calculateScheduledSessions(courseId, studentBranch, year, monthIndex) {
             showApp('student');
         });
 
-        // Password Toggle
-        document.getElementById('togglePassword').addEventListener('click', togglePasswordVisibility);
-
         // Admin & Utility Handlers
         document.getElementById('enrollBtn').addEventListener('click', handleEnrollStudent);
         document.getElementById('sendBroadcastBtn').addEventListener('click', handleSendBroadcast);
         document.getElementById('refreshBtn').addEventListener('click', () => location.reload());
         document.getElementById('exportBtn').addEventListener('click', handleExport);
         document.getElementById('calculateBtn').addEventListener('click', handleCalculate);
-        document.getElementById('dashboardSubjectSelect').addEventListener('change', updateDashboardSummary);
 
         // Timetable Handlers
         const addCourseBtn = document.getElementById('addCourseBtn');
@@ -1351,33 +1046,10 @@ function calculateScheduledSessions(courseId, studentBranch, year, monthIndex) {
         // General Handlers
         document.getElementById('submitFeedbackBtn').addEventListener('click', handleSubmitFeedback);
         
-        // FIX 2: Reports Section Event Listeners
-        const generateMonthlyReportBtn = document.getElementById('generateMonthlyReportBtn');
-        if(generateMonthlyReportBtn) generateMonthlyReportBtn.addEventListener('click', () => {
-            const monthEl = document.getElementById('reportMonth');
-            const monthDisplayEl = document.getElementById('reportMonthDisplay');
-            if(monthEl && monthDisplayEl) {
-                monthDisplayEl.textContent = monthEl.value;
-                generateMonthlyReport();
-            }
-        });
-        
-        const downloadReportCsvBtn = document.getElementById('downloadReportCsvBtn');
-        if(downloadReportCsvBtn) downloadReportCsvBtn.addEventListener('click', handleExportCurrentReport);
-        
-        const exportAllLogsBtn = document.getElementById('exportAllLogsBtn');
-        if(exportAllLogsBtn) exportAllLogsBtn.addEventListener('click', handleExport);
-        
-        const exportCurrentReportBtn = document.getElementById('exportCurrentReportBtn');
-        if(exportCurrentReportBtn) exportCurrentReportBtn.addEventListener('click', handleExportCurrentReport);
-
         window.generateMonthlyReport = generateMonthlyReport;
-
-        populateDynamicMonths();
 
         loadLatestBroadcast();
     });
 </script>
-
 </body>
 </html>
